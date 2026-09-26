@@ -89,6 +89,29 @@ test('active applications use a timeline while withdrawn applications use a non-
     assert.doesNotMatch(html, /ph-arrow-u-up-left/);
 });
 
+test('My Applications includes accessible search, status, sort, and no-match controls', () => {
+    const html = renderTracker();
+
+    assert.match(html, /id="application-search"/);
+    assert.match(html, /placeholder="Internship title or company name"/);
+    assert.match(html, /id="application-status"/);
+    assert.match(html, /id="application-sort"/);
+
+    const noMatchHtml = ejs.render(fs.readFileSync(trackerPath, 'utf8').replace("<% layout('layouts/boilerplate') %>", ''), {
+        applications: [],
+        totalApplications: 2,
+        searchQuery: 'missing',
+        statusFilter: 'all',
+        sort: 'recent',
+        sanitizeHttpUrl,
+        formatRelativeTime: () => 'just now',
+        formatLocalizedDateTime: () => 'now'
+    }, { filename: trackerPath });
+
+    assert.match(noMatchHtml, /No matching applications/);
+    assert.match(noMatchHtml, /Clear filters/);
+});
+
 test('interview details remain nested in the related application card', () => {
     const html = renderTracker();
     const interviewStart = html.indexOf('id="app-card-interview-card"');

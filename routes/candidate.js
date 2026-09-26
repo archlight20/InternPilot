@@ -11,6 +11,7 @@ const User = require('../models/User');
 const { notifyCandidateWithdrawal } = require('../utils/recruiterNotifications');
 const { isAuthenticated, authorize } = require('../middleware/auth');
 const { formatRelativeTime, formatLocalizedDateTime } = require('../utils/dateFormat');
+const { filterAndSortApplications } = require('../utils/applicationSearch');
 
 /**
  * GET /candidate/saved-internships
@@ -82,6 +83,7 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
             shortlisted: allApplications.filter(a => a.status === 'Shortlisted').length,
             rejected: allApplications.filter(a => a.status === 'Rejected').length
         };
+        const applicationSearch = filterAndSortApplications(applications, req.query);
 
         let query = { candidate: userId };
 
@@ -122,11 +124,12 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
         res.render('candidate/candidate-tracker', {
             candidate,
             currentUser: req.user,
-            applications,
+            applications: applicationSearch.applications,
             stats,
-            searchQuery,
-            statusFilter,
-            sortOrder,
+            searchQuery: applicationSearch.search,
+            statusFilter: applicationSearch.status,
+            sort: applicationSearch.sort,
+            totalApplications: applicationSearch.totalApplications,
             pageTitle: 'My Applications',
             formatRelativeTime,
             formatLocalizedDateTime
