@@ -19,6 +19,7 @@ const notificationSchema = new mongoose.Schema({
             'application_status', 
             'application_shortlisted', 
             'new_matching_internship',
+            'saved_search_digest',
             'new_application',
             'candidate_withdrawal',
             'approaching_deadline',
@@ -43,7 +44,11 @@ const notificationSchema = new mongoose.Schema({
     },
     metadata: {
         threshold: { type: Number },
-        interviewId: { type: String }
+        interviewId: { type: String },
+        savedSearchId: { type: mongoose.Schema.Types.ObjectId, ref: 'SavedSearch' },
+        digestKey: { type: String },
+        internshipCount: { type: Number },
+        searchNames: [{ type: String }]
     },
     isRead: { type: Boolean, default: false, index: true }
 }, { timestamps: true });
@@ -58,6 +63,14 @@ notificationSchema.index(
     {
         unique: true,
         partialFilterExpression: { type: 'new_matching_internship' }
+    }
+);
+
+notificationSchema.index(
+    { recipient: 1, type: 1, 'metadata.digestKey': 1 },
+    {
+        unique: true,
+        partialFilterExpression: { type: 'saved_search_digest' }
     }
 );
 

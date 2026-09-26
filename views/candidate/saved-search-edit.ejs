@@ -1,0 +1,138 @@
+<% layout('layouts/boilerplate') %>
+
+<%
+    const search = typeof savedSearch !== 'undefined' && savedSearch ? savedSearch : {};
+    const criteria = search.criteria || {};
+    const skills = Array.isArray(criteria.skills) ? criteria.skills : [];
+    const durations = Array.isArray(criteria.duration) ? criteria.duration : [];
+    const delivery = search.delivery || {};
+    const durationOptions = [
+        { key: 'upto3', label: 'Up to 3 months' },
+        { key: '3to6', label: '3 to 6 months' },
+        { key: '6to12', label: '6 to 12 months' },
+        { key: 'over12', label: 'Over 12 months' }
+    ];
+%>
+
+<div class="mx-auto max-w-3xl space-y-6 py-4 sm:py-8">
+    <div class="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <a href="/candidate/saved-searches" class="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 transition hover:text-indigo-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                <i class="ph-bold ph-arrow-left" aria-hidden="true"></i> Saved searches
+            </a>
+            <h1 class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900">Edit saved search</h1>
+            <p class="mt-1 text-sm leading-6 text-slate-600">Update the filters and the alert schedule in one place.</p>
+        </div>
+        <a href="/candidate/saved-searches/<%= search._id %>/results" class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+            View current results <i class="ph-bold ph-arrow-up-right" aria-hidden="true"></i>
+        </a>
+    </div>
+
+    <form action="/candidate/saved-searches/<%= search._id %>?_method=PATCH" method="POST" class="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+        <input type="hidden" name="returnTo" value="/candidate/saved-searches">
+        <input type="hidden" name="deliveryConfigured" value="true">
+
+        <section>
+            <div class="mb-4">
+                <h2 class="text-base font-extrabold text-slate-900">Search details</h2>
+                <p class="mt-1 text-xs leading-5 text-slate-500">At least one filter is required so alerts stay relevant.</p>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="sm:col-span-2">
+                    <label for="saved-search-name" class="block text-xs font-bold text-slate-700">Search name</label>
+                    <input id="saved-search-name" name="name" required maxlength="80" value="<%= search.name || '' %>" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                </div>
+                <div class="sm:col-span-2">
+                    <label for="saved-search-keywords" class="block text-xs font-bold text-slate-700">Keywords</label>
+                    <input id="saved-search-keywords" name="criteria[search]" value="<%= criteria.search || '' %>" placeholder="e.g. JavaScript, frontend, analyst" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                    <p class="mt-1.5 text-[11px] text-slate-500">Matches internship title, company, sector, and required skills.</p>
+                </div>
+                <div>
+                    <label for="saved-search-sector" class="block text-xs font-bold text-slate-700">Sector</label>
+                    <input id="saved-search-sector" name="criteria[sector]" value="<%= criteria.sector || '' %>" placeholder="e.g. Information Technology" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                </div>
+                <div>
+                    <label for="saved-search-location" class="block text-xs font-bold text-slate-700">Location</label>
+                    <input id="saved-search-location" name="criteria[location]" value="<%= criteria.location || '' %>" placeholder="District or state" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                </div>
+                <div class="sm:col-span-2">
+                    <label for="saved-search-skills" class="block text-xs font-bold text-slate-700">Required skills</label>
+                    <input id="saved-search-skills" name="criteria[skills]" value="<%= skills.join(', ') %>" placeholder="Comma-separated, e.g. JavaScript, MongoDB" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                </div>
+                <div>
+                    <label for="saved-search-min-stipend" class="block text-xs font-bold text-slate-700">Minimum monthly stipend</label>
+                    <input id="saved-search-min-stipend" name="criteria[minStipend]" type="number" min="0" step="1" value="<%= criteria.minStipend === undefined || criteria.minStipend === null ? '' : criteria.minStipend %>" placeholder="e.g. 5000" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                </div>
+                <div>
+                    <label for="saved-search-max-stipend" class="block text-xs font-bold text-slate-700">Maximum monthly stipend</label>
+                    <input id="saved-search-max-stipend" name="criteria[maxStipend]" type="number" min="0" step="1" value="<%= criteria.maxStipend === undefined || criteria.maxStipend === null ? '' : criteria.maxStipend %>" placeholder="e.g. 20000" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                </div>
+            </div>
+            <fieldset class="mt-5">
+                <legend class="text-xs font-bold text-slate-700">Duration</legend>
+                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                    <% durationOptions.forEach(option => { %>
+                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                            <input type="checkbox" name="criteria[duration]" value="<%= option.key %>" <%= durations.includes(option.key) ? 'checked' : '' %> class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600">
+                            <%= option.label %>
+                        </label>
+                    <% }) %>
+                </div>
+            </fieldset>
+        </section>
+
+        <section class="border-t border-slate-100 pt-6">
+            <div class="mb-4">
+                <h2 class="text-base font-extrabold text-slate-900">Alert preferences</h2>
+                <p class="mt-1 text-xs leading-5 text-slate-500">Turn alerts off without losing your saved filters.</p>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="saved-search-frequency" class="block text-xs font-bold text-slate-700">Frequency</label>
+                    <select id="saved-search-frequency" name="frequency" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100">
+                        <option value="instant" <%= search.frequency === 'instant' ? 'selected' : '' %>>Instant</option>
+                        <option value="daily" <%= search.frequency === 'daily' ? 'selected' : '' %>>Daily digest</option>
+                        <option value="weekly" <%= search.frequency === 'weekly' ? 'selected' : '' %>>Weekly digest</option>
+                        <option value="off" <%= search.frequency === 'off' ? 'selected' : '' %>>Off — save filters only</option>
+                    </select>
+                </div>
+                <fieldset>
+                    <legend class="text-xs font-bold text-slate-700">Delivery</legend>
+                    <div class="mt-1.5 flex flex-wrap gap-3">
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+                            <input name="inApp" type="checkbox" value="on" <%= delivery.inApp ? 'checked' : '' %> class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"> In-app
+                        </label>
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+                            <input name="email" type="checkbox" value="on" <%= delivery.email ? 'checked' : '' %> class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"> Email
+                        </label>
+                    </div>
+                </fieldset>
+            </div>
+            <p id="deliveryError" class="mt-3 hidden text-xs font-bold text-rose-700" role="alert">Choose at least one delivery channel, or choose “Off”.</p>
+        </section>
+
+        <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+            <a href="/candidate/saved-searches" class="inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">Cancel</a>
+            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                <i class="ph-bold ph-check" aria-hidden="true"></i> Update saved search
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    (() => {
+        const form = document.querySelector('form[action*="/candidate/saved-searches/"]');
+        if (!form) return;
+        form.addEventListener('submit', event => {
+            const frequency = form.querySelector('[name="frequency"]');
+            const hasDelivery = Array.from(form.querySelectorAll('[name="inApp"], [name="email"]')).some(input => input.checked);
+            const error = document.getElementById('deliveryError');
+            if (frequency && frequency.value !== 'off' && !hasDelivery) {
+                event.preventDefault();
+                error?.classList.remove('hidden');
+                form.querySelector('[name="inApp"]')?.focus();
+            }
+        });
+    })();
+</script>

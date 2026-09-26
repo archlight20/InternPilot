@@ -70,6 +70,13 @@ const internshipSchema = new mongoose.Schema({
     },
     applicationDeadline: {
         type: Date
+    },
+    // Unlike createdAt, this reflects when candidates could actually discover
+    // a listing. It is refreshed when a draft is published or a paused listing
+    // is resumed, which gives saved-search digests the correct time window.
+    publishedAt: {
+        type: Date,
+        index: true
     }
 }, { toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
@@ -81,6 +88,15 @@ internshipSchema.pre('save', function (next) {
     } else {
         this.isPaused = false;
     }
+
+    if (
+        this.status === 'published'
+        && !this.isPaused
+        && (this.isNew || this.isModified('status'))
+    ) {
+        this.publishedAt = new Date();
+    }
+
     if (typeof next === 'function') {
         next();
     }

@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 /**
  * Utility helper for parsing, building Mongoose queries, and preserving URL query state
  * for Internship search, filtering, sorting, and pagination (GitHub Issue #10).
@@ -59,6 +61,20 @@ function parseList(value) {
 }
 
 /**
+ * Returns a bounded string query value. Express can represent repeated or
+ * maliciously structured query values as arrays/objects, neither of which is
+ * meaningful for a saved-search criterion.
+ *
+ * @param {*} value
+ * @param {number} maxLength
+ * @returns {string}
+ */
+function parseText(value, maxLength = 160) {
+    const raw = Array.isArray(value) ? value[0] : value;
+    return typeof raw === 'string' ? raw.trim().slice(0, maxLength) : '';
+}
+
+/**
  * Reads a rupee amount from the query string.
  *
  * @param {string|string[]|undefined} value "5000", "5,000" and "₹5000" all work.
@@ -71,6 +87,173 @@ function parseAmount(value) {
     const amount = Number(String(raw).replace(/[,\s₹]/g, ''));
     if (!Number.isFinite(amount) || amount < 0) return null;
     return Math.floor(amount);
+}
+
+/**
+ * Normalizes the durable portion of an internship search. Presentation-only
+ * values (status, sort, page and limit) are deliberately omitted: a saved
+ * search should always point to currently publishable opportunities, not a
+ * stale pagination position or a company-only status tab.
+ *
+ * @param {Object} input
+ * @returns {{search: string, sector: string, location: string, skills: string[], minStipend: string, maxStipend: string, duration: string[]}}
+ */
+function normalizeSavedSearchCriteria(input = {}) {
+    const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    const validDurations = new Set(DURATION_BUCKETS.map(bucket => bucket.key));
+    let minStipend = parseAmount(source.minStipend);
+    let maxStipend = parseAmount(source.maxStipend);
+
+    if (minStipend !== null && maxStipend !== null && minStipend > maxStipend) {
+        [minStipend, maxStipend] = [maxStipend, minStipend];
+    }
+
+    return {
+        search: parseText(source.search || source.q, 160),
+        sector: parseText(source.sector, 80),
+        location: parseText(source.location, 160),
+        skills: parseList(source.skills),
+        minStipend: minStipend === null ? '' : String(minStipend),
+        maxStipend: maxStipend === null ? '' : String(maxStipend),
+        duration: parseList(source.duration).filter(key => validDurations.has(key))
+    };
+}
+
+/**
+ * Whether a saved search has at least one real discovery criterion. Saving a
+ * completely blank search would subscribe a candidate to every future post
+ * and is almost never intentional.
+ *
+ * @param {Object} criteria
+ * @returns {boolean}
+ */
+function hasSavedSearchCriteria(criteria = {}) {
+    const normalized = normalizeSavedSearchCriteria(criteria);
+    return Boolean(
+        normalized.search || normalized.sector || normalized.location ||
+        normalized.skills.length || normalized.minStipend ||
+        normalized.maxStipend || normalized.duration.length
+    );
+}
+
+/**
+ * Produces a stable, candidate-scoped duplicate key from normalized criteria.
+ * SHA-256 keeps the indexed field short even when every supported filter is
+ * used, while the model index provides the actual uniqueness guarantee.
+ *
+ * @param {Object} criteria
+ * @returns {string}
+ */
+function getSavedSearchCriteriaHash(criteria = {}) {
+    const normalized = normalizeSavedSearchCriteria(criteria);
+    return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+/**
+ * Builds the public result URL for a saved search. `buildQueryString` is
+ * intentionally relative for existing listing controls, so this helper adds
+ * the `/internships` prefix for routes under `/candidate`.
+ *
+ * @param {Object} criteria
+ * @returns {string}
+ */
+function buildSavedSearchResultsUrl(criteria = {}) {
+    const normalized = normalizeSavedSearchCriteria(criteria);
+    const params = new URLSearchParams();
+
+    // Saved alerts and the preview only consider live opportunities, so the
+    // result link should not silently switch back to the public "all" tab.
+    params.set('status', 'active');
+
+    ['search', 'sector', 'location', 'minStipend', 'maxStipend'].forEach(key => {
+        if (normalized[key]) params.set(key, normalized[key]);
+    });
+    if (normalized.skills.length) params.set('skills', normalized.skills.join(','));
+    if (normalized.duration.length) params.set('duration', normalized.duration.join(','));
+
+    const queryString = params.toString();
+    return queryString ? `/internships?${queryString}` : '/internships';
+}
+
+function includesNormalized(haystack, needle) {
+    return String(haystack || '').trim().toLowerCase().includes(String(needle || '').trim().toLowerCase());
+}
+
+/**
+ * Tests one listing against the same durable criteria used by the public
+ * internship filter. It is intentionally pure so it can be reused for the
+ * saved-search preview, instant publish alerts, and digest jobs.
+ *
+ * @param {Object} internship
+ * @param {Object} criteria
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
+function matchesInternshipCriteria(internship = {}, criteria = {}, now = new Date()) {
+    const normalized = normalizeSavedSearchCriteria(criteria);
+    if (!internship || internship.status !== 'published' || internship.isPaused === true) return false;
+
+    const deadline = internship.applicationDeadline ? new Date(internship.applicationDeadline) : null;
+    if (deadline && !Number.isNaN(deadline.getTime()) && deadline.getTime() < now.getTime()) return false;
+
+    if (normalized.search) {
+        const fields = [
+            internship.title,
+            internship.companyName || internship.company,
+            internship.sector,
+            ...(Array.isArray(internship.requiredSkills) ? internship.requiredSkills : [])
+        ];
+        if (!fields.some(field => includesNormalized(field, normalized.search))) return false;
+    }
+
+    if (normalized.sector && String(internship.sector || '').trim().toLowerCase() !== normalized.sector.toLowerCase()) return false;
+
+    if (normalized.location) {
+        const location = internship.location && typeof internship.location === 'object'
+            ? [internship.location.district, internship.location.state]
+            : [internship.location];
+        if (!location.some(value => includesNormalized(value, normalized.location))) return false;
+    }
+
+    if (normalized.skills.length) {
+        const requiredSkills = (Array.isArray(internship.requiredSkills) ? internship.requiredSkills : [])
+            .map(skill => String(skill || '').trim().toLowerCase());
+        if (!normalized.skills.some(skill => requiredSkills.includes(skill.toLowerCase()))) return false;
+    }
+
+    const stipend = Number(internship.monthlyStipend);
+    if (normalized.minStipend && (!Number.isFinite(stipend) || stipend < Number(normalized.minStipend))) return false;
+    if (normalized.maxStipend && (!Number.isFinite(stipend) || stipend > Number(normalized.maxStipend))) return false;
+
+    if (normalized.duration.length) {
+        const months = parseDurationMonths(internship.duration);
+        if (!normalized.duration.some(key => isInDurationBucket(months, key))) return false;
+    }
+
+    return true;
+}
+
+/**
+ * Produces concise, human-readable chips for management-page cards.
+ *
+ * @param {Object} criteria
+ * @returns {string[]}
+ */
+function describeSavedSearchCriteria(criteria = {}) {
+    const normalized = normalizeSavedSearchCriteria(criteria);
+    const labels = [];
+    if (normalized.search) labels.push(`Search: ${normalized.search}`);
+    if (normalized.sector) labels.push(`Sector: ${normalized.sector}`);
+    if (normalized.location) labels.push(`Location: ${normalized.location}`);
+    normalized.skills.forEach(skill => labels.push(`Skill: ${skill}`));
+    if (normalized.minStipend || normalized.maxStipend) {
+        labels.push(`Stipend: ${formatStipendRange(normalized.minStipend, normalized.maxStipend)}`);
+    }
+    normalized.duration.forEach(key => {
+        const bucket = DURATION_BUCKETS.find(item => item.key === key);
+        if (bucket) labels.push(`Duration: ${bucket.label}`);
+    });
+    return labels;
 }
 
 /**
@@ -115,11 +298,11 @@ function isInDurationBucket(months, key) {
  * @returns {Object} { filterObj, sortObj, state, page, limit }
  */
 function parseInternshipQuery(query = {}) {
-    const search = (query.search || query.q || '').trim();
-    const sector = (query.sector || '').trim();
-    const location = (query.location || '').trim();
-    const status = (query.status || query.filter || 'all').trim(); // 'all', 'active', 'paused'
-    const sort = (query.sort || 'latest').trim();
+    const search = parseText(query.search || query.q);
+    const sector = parseText(query.sector, 80);
+    const location = parseText(query.location);
+    const status = parseText(query.status || query.filter, 24) || 'all'; // 'all', 'active', 'paused'
+    const sort = parseText(query.sort, 32) || 'latest';
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.max(1, parseInt(query.limit, 10) || DEFAULT_LIMIT);
 
@@ -449,6 +632,7 @@ function uniqueSortedOptions(values = []) {
 module.exports = {
     DEFAULT_LIMIT,
     escapeRegex,
+    parseText,
     parseInternshipQuery,
     getPaginationRange,
     buildPaginationData,
@@ -461,5 +645,11 @@ module.exports = {
     applyDurationFilter,
     getActiveFilters,
     clearFiltersHref,
-    uniqueSortedOptions
+    uniqueSortedOptions,
+    normalizeSavedSearchCriteria,
+    hasSavedSearchCriteria,
+    getSavedSearchCriteriaHash,
+    buildSavedSearchResultsUrl,
+    matchesInternshipCriteria,
+    describeSavedSearchCriteria
 };

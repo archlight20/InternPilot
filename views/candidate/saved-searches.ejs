@@ -1,0 +1,280 @@
+<% layout('layouts/boilerplate') %>
+
+<%
+    const searches = Array.isArray(savedSearches) ? savedSearches : [];
+    const searchLimit = Number.isFinite(Number(maxSavedSearches)) ? Number(maxSavedSearches) : 10;
+    const formatFrequency = value => ({
+        instant: 'Instant',
+        daily: 'Daily digest',
+        weekly: 'Weekly digest',
+        off: 'Alerts off'
+    }[value] || 'Instant');
+    const formatDelivery = delivery => {
+        const channels = [];
+        if (delivery && delivery.inApp) channels.push('In-app');
+        if (delivery && delivery.email) channels.push('Email');
+        return channels.length ? channels.join(' + ') : 'No delivery channel';
+    };
+    const formatDateTime = value => {
+        const date = value ? new Date(value) : null;
+        if (!date || Number.isNaN(date.getTime())) return null;
+        return new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        }).format(date);
+    };
+    const formatLocation = value => {
+        if (value && typeof value === 'object') {
+            return [value.district, value.state].filter(Boolean).join(', ') || 'Location flexible';
+        }
+        return value || 'Location flexible';
+    };
+    const formatStipend = value => {
+        if (value === undefined || value === null || value === '') return null;
+        const text = String(value).trim();
+        if (text.toLowerCase() === 'unpaid' || value === 0) return 'Unpaid';
+        if (text.toLowerCase() === 'performance based') return 'Performance based';
+        const amount = Number(value);
+        return Number.isFinite(amount) ? `₹${amount.toLocaleString()}/mo` : text;
+    };
+%>
+
+<div class="mx-auto max-w-6xl space-y-6 py-4 sm:py-8">
+    <section class="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-6 shadow-sm sm:p-8">
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div class="max-w-2xl">
+                <div class="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white/80 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-700">
+                    <i class="ph-bold ph-bell-ringing" aria-hidden="true"></i>
+                    Opportunity alerts
+                </div>
+                <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Saved Searches</h1>
+                <p class="mt-2 text-sm leading-6 text-slate-600">
+                    Keep your best internship filters ready and choose when you want to hear about new matches.
+                </p>
+            </div>
+            <a href="/internships" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                <i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i>
+                Find internships
+            </a>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="rounded-xl border border-white bg-white/80 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Saved</p>
+                <p class="mt-1 text-2xl font-extrabold text-slate-900"><%= searches.length %><span class="text-sm font-semibold text-slate-500"> / <%= searchLimit %></span></p>
+            </div>
+            <div class="rounded-xl border border-white bg-white/80 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Matching now</p>
+                <p class="mt-1 text-2xl font-extrabold text-slate-900"><%= searches.reduce((sum, search) => sum + (Number(search.matchingCount) || 0), 0) %></p>
+            </div>
+            <div class="rounded-xl border border-white bg-white/80 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Active alerts</p>
+                <p class="mt-1 text-2xl font-extrabold text-slate-900"><%= searches.filter(search => !search.isPaused && search.frequency !== 'off').length %></p>
+            </div>
+        </div>
+    </section>
+
+    <% if (searches.length === 0) { %>
+        <section class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center shadow-sm">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-2xl text-indigo-700">
+                <i class="ph-bold ph-funnel-simple" aria-hidden="true"></i>
+            </div>
+            <h2 class="mt-5 text-lg font-extrabold text-slate-900">No saved searches yet</h2>
+            <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
+                Filter internships by skill, location, stipend, duration, or sector, then save the search to get alerts for new matches.
+            </p>
+            <a href="/internships" class="mt-6 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                <i class="ph-bold ph-sliders-horizontal" aria-hidden="true"></i>
+                Explore and save a search
+            </a>
+        </section>
+    <% } else { %>
+        <section aria-label="Your saved internship searches" class="space-y-5">
+            <% searches.forEach((savedSearch, index) => { %>
+                <% const isPaused = Boolean(savedSearch.isPaused); %>
+                <% const isOff = savedSearch.frequency === 'off'; %>
+                <% const preview = Array.isArray(savedSearch.matchingPreview) ? savedSearch.matchingPreview : []; %>
+                <% const criteriaLabels = Array.isArray(savedSearch.criteriaLabels) ? savedSearch.criteriaLabels : []; %>
+                <% const deliverySummary = formatDelivery(savedSearch.delivery); %>
+                <% const alertDate = savedSearch.lastAlertAt || savedSearch.lastDigestAt; %>
+                <article class="overflow-hidden rounded-2xl border <%= isPaused || isOff ? 'border-slate-200 bg-slate-50/70' : 'border-slate-200 bg-white' %> shadow-sm">
+                    <div class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_19rem] lg:p-6">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="truncate text-lg font-extrabold text-slate-900" title="<%= savedSearch.name %>"><%= savedSearch.name %></h2>
+                                        <% if (isPaused) { %>
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800"><i class="ph-bold ph-pause-circle" aria-hidden="true"></i> Paused</span>
+                                        <% } else if (isOff) { %>
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"><i class="ph-bold ph-bell-slash" aria-hidden="true"></i> Alerts off</span>
+                                        <% } else { %>
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800"><i class="ph-bold ph-bell" aria-hidden="true"></i> Alert active</span>
+                                        <% } %>
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        <% if (alertDate && formatDateTime(alertDate)) { %>
+                                            Last delivered <time datetime="<%= new Date(alertDate).toISOString() %>"><%= formatDateTime(alertDate) %></time>
+                                        <% } else if (isPaused) { %>
+                                            Alerts are paused; your filters are still saved.
+                                        <% } else if (isOff) { %>
+                                            Alerts are off; you can still view matching internships anytime.
+                                        <% } else { %>
+                                            We’ll watch for new internships that match these filters.
+                                        <% } %>
+                                    </p>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                    <a href="/candidate/saved-searches/<%= savedSearch._id %>/edit" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                                        <i class="ph-bold ph-pencil-simple" aria-hidden="true"></i>
+                                        Edit filters
+                                    </a>
+                                    <a href="/candidate/saved-searches/<%= savedSearch._id %>/results" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                                        View results
+                                        <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 flex flex-wrap gap-2" aria-label="Saved filters">
+                                <% if (criteriaLabels.length) { %>
+                                    <% criteriaLabels.forEach(label => { %>
+                                        <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700"><%= label %></span>
+                                    <% }) %>
+                                <% } else { %>
+                                    <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">All active internships</span>
+                                <% } %>
+                            </div>
+
+                            <div class="mt-5 rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 class="text-sm font-extrabold text-slate-900">
+                                        <span class="text-indigo-700"><%= Number(savedSearch.matchingCount) || 0 %></span>
+                                        <%= Number(savedSearch.matchingCount) === 1 ? 'internship matches now' : 'internships match now' %>
+                                    </h3>
+                                    <% if (Number(savedSearch.matchingCount) > preview.length) { %>
+                                        <a href="/candidate/saved-searches/<%= savedSearch._id %>/results" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:underline">See all matches</a>
+                                    <% } %>
+                                </div>
+                                <% if (preview.length) { %>
+                                    <ul class="mt-3 divide-y divide-slate-200" aria-label="Matching internship preview">
+                                        <% preview.forEach(internship => { %>
+                                            <% const stipend = formatStipend(internship.monthlyStipend); %>
+                                            <li class="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                                                <div class="min-w-0">
+                                                    <a href="/internships/<%= internship._id %>" class="block truncate text-sm font-bold text-slate-800 hover:text-indigo-700 hover:underline"><%= internship.title || 'Untitled internship' %></a>
+                                                    <p class="truncate text-xs text-slate-500"><%= internship.companyName || internship.company || 'Company' %> · <%= formatLocation(internship.location) %></p>
+                                                </div>
+                                                <% if (stipend) { %>
+                                                    <span class="shrink-0 text-xs font-bold text-slate-600"><%= stipend %></span>
+                                                <% } %>
+                                            </li>
+                                        <% }) %>
+                                    </ul>
+                                <% } else { %>
+                                    <p class="mt-2 text-xs leading-5 text-slate-500">No current matches. We’ll keep this search ready for newly published opportunities.</p>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <aside class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                                <i class="ph-bold ph-gear-six text-indigo-700" aria-hidden="true"></i>
+                                Alert settings
+                            </div>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">Currently: <span class="font-semibold text-slate-700"><%= formatFrequency(savedSearch.frequency) %> · <%= deliverySummary %></span></p>
+
+                            <form action="/candidate/saved-searches/<%= savedSearch._id %>?_method=PATCH" method="POST" class="mt-4 space-y-3" data-saved-search-settings>
+                                <input type="hidden" name="returnTo" value="/candidate/saved-searches">
+                                <input type="hidden" name="deliveryConfigured" value="true">
+                                <div>
+                                    <label for="saved-search-name-<%= index %>" class="block text-xs font-bold text-slate-700">Search name</label>
+                                    <input id="saved-search-name-<%= index %>" name="name" type="text" maxlength="80" required value="<%= savedSearch.name %>" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                                </div>
+                                <div>
+                                    <label for="saved-search-frequency-<%= index %>" class="block text-xs font-bold text-slate-700">How often</label>
+                                    <select id="saved-search-frequency-<%= index %>" name="frequency" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                                        <option value="instant" <%= savedSearch.frequency === 'instant' ? 'selected' : '' %>>Instant</option>
+                                        <option value="daily" <%= savedSearch.frequency === 'daily' ? 'selected' : '' %>>Daily digest</option>
+                                        <option value="weekly" <%= savedSearch.frequency === 'weekly' ? 'selected' : '' %>>Weekly digest</option>
+                                        <option value="off" <%= savedSearch.frequency === 'off' ? 'selected' : '' %>>Off</option>
+                                    </select>
+                                </div>
+                                <fieldset>
+                                    <legend class="text-xs font-bold text-slate-700">Deliver to</legend>
+                                    <div class="mt-2 grid gap-2">
+                                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                                            <input name="inApp" type="checkbox" value="on" <%= savedSearch.delivery && savedSearch.delivery.inApp ? 'checked' : '' %> class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                            <i class="ph-bold ph-bell text-indigo-700" aria-hidden="true"></i> In-app notification
+                                        </label>
+                                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                                            <input name="email" type="checkbox" value="on" <%= savedSearch.delivery && savedSearch.delivery.email ? 'checked' : '' %> class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                            <i class="ph-bold ph-envelope-simple text-indigo-700" aria-hidden="true"></i> Email alert
+                                        </label>
+                                    </div>
+                                    <p data-delivery-error class="mt-2 hidden text-xs font-semibold text-rose-700" role="alert">Choose at least one delivery channel, or turn alerts off.</p>
+                                </fieldset>
+                                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2.5 text-xs font-bold text-white transition-colors hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2">
+                                    <i class="ph-bold ph-check" aria-hidden="true"></i>
+                                    Save settings
+                                </button>
+                            </form>
+
+                            <div class="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4">
+                                <form action="/candidate/saved-searches/<%= savedSearch._id %>/pause" method="POST">
+                                    <input type="hidden" name="returnTo" value="/candidate/saved-searches">
+                                    <input type="hidden" name="isPaused" value="<%= isPaused ? 'false' : 'true' %>">
+                                    <button type="submit" class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                                        <i class="ph-bold <%= isPaused ? 'ph-play-circle' : 'ph-pause-circle' %>" aria-hidden="true"></i>
+                                        <%= isPaused ? 'Resume' : 'Pause' %>
+                                    </button>
+                                </form>
+                                <form action="/candidate/saved-searches/<%= savedSearch._id %>?_method=DELETE" method="POST" data-delete-saved-search>
+                                    <input type="hidden" name="returnTo" value="/candidate/saved-searches">
+                                    <button type="submit" class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2 py-2 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2">
+                                        <i class="ph-bold ph-trash" aria-hidden="true"></i>
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </aside>
+                    </div>
+                </article>
+            <% }) %>
+        </section>
+    <% } %>
+
+    <aside class="rounded-xl border border-sky-100 bg-sky-50/60 p-4 text-sm text-slate-700">
+        <div class="flex items-start gap-3">
+            <i class="ph-bold ph-info mt-0.5 text-lg text-sky-700" aria-hidden="true"></i>
+            <p><span class="font-extrabold text-slate-900">Tip:</span> Alerts only include newly published internships that match your saved filters. Open any saved search to see all matching opportunities right now.</p>
+        </div>
+    </aside>
+</div>
+
+<script>
+    (() => {
+        document.querySelectorAll('[data-saved-search-settings]').forEach(form => {
+            form.addEventListener('submit', event => {
+                const frequency = form.querySelector('[name="frequency"]');
+                const channels = Array.from(form.querySelectorAll('input[name="inApp"], input[name="email"]'));
+                const error = form.querySelector('[data-delivery-error]');
+                const hasChannel = channels.some(input => input.checked);
+
+                if (frequency && frequency.value !== 'off' && !hasChannel) {
+                    event.preventDefault();
+                    if (error) error.classList.remove('hidden');
+                    channels[0]?.focus();
+                } else if (error) {
+                    error.classList.add('hidden');
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-delete-saved-search]').forEach(form => {
+            form.addEventListener('submit', event => {
+                if (!window.confirm('Delete this saved search? This cannot be undone.')) event.preventDefault();
+            });
+        });
+    })();
+</script>
