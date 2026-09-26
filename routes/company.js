@@ -29,6 +29,7 @@ const { logRecruiterActivity } = require('../utils/activityLogger');
 const { buildRecruiterOverview } = require('../utils/dashboardStats');
 const { calculateCandidateMatch } = require('../utils/candidateMatcher');
 const { buildSkillProfiles } = require('../utils/skillProfiles');
+const { ApplicationKitValidationError, parseApplicationQuestions } = require('../utils/applicationKit');
 
 function handleLogoUpload(fieldName) {
     return (req, res, next) => {
@@ -85,6 +86,14 @@ const notifyPublishedInternship = (internship) => {
         });
     }
 };
+
+function questionsFromListingRequest(body, fallback = []) {
+    const hasQuestionFields = Object.prototype.hasOwnProperty.call(body || {}, 'applicationQuestions')
+        || Object.prototype.hasOwnProperty.call(body || {}, 'applicationQuestion')
+        || Object.prototype.hasOwnProperty.call(body || {}, 'applicationQuestionsConfigured');
+
+    return hasQuestionFields ? parseApplicationQuestions(body) : fallback;
+}
 
 // Company Profile Management (GET: view/edit form)
 router.get('/company/profile', isAuthenticated, requireCompanyRole(['company', 'recruiter']), async (req, res) => {

@@ -40,9 +40,19 @@ const userSchema = new mongoose.Schema({
             required: true
         }
     }],
+    // `resume` remains the legacy/current-resume field so existing profile
+    // pages and integrations continue to work. Each upload is also retained
+    // below as a selectable application-kit resume version.
     resume: { type: String, default: '' },
     resumeOriginalName: { type: String, default: '', trim: true },
     resumeUploadedAt: { type: Date },
+    resumeVersions: [{
+        label: { type: String, required: true, trim: true, maxlength: 100 },
+        fileUrl: { type: String, required: true, trim: true },
+        fileName: { type: String, default: '', trim: true, maxlength: 180 },
+        isDefault: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now }
+    }],
 
     resumeQuality: {
     quantifiableAchievements: {

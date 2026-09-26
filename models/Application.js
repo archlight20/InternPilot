@@ -1,6 +1,64 @@
 const mongoose = require("mongoose");
 const { isSafeHttpUrl } = require('../utils/safeUrl');
 
+const applicationKitSchema = new mongoose.Schema({
+    submittedAt: { type: Date, required: true },
+    resume: {
+        sourceId: { type: String, default: '' },
+        label: { type: String, default: '' },
+        fileUrl: { type: String, default: '' },
+        fileName: { type: String, default: '' }
+    },
+    projects: [{
+        _id: false,
+        sourceId: { type: String, default: '' },
+        title: { type: String, default: '' },
+        description: { type: String, default: '' },
+        link: { type: String, default: '' },
+        techStack: [{ type: String }],
+        fileUrl: { type: String, default: '' },
+        fileName: { type: String, default: '' }
+    }],
+    certifications: [{
+        _id: false,
+        sourceId: { type: String, default: '' },
+        name: { type: String, default: '' },
+        issuer: { type: String, default: '' },
+        issueDate: { type: Date },
+        link: { type: String, default: '' },
+        fileUrl: { type: String, default: '' },
+        fileName: { type: String, default: '' }
+    }],
+    skills: [{
+        _id: false,
+        name: { type: String, required: true },
+        proficiency: {
+            type: String,
+            enum: ['Beginner', 'Intermediate', 'Advanced'],
+            default: 'Intermediate'
+        }
+    }],
+    answers: [{
+        _id: false,
+        questionId: { type: String, required: true },
+        prompt: { type: String, required: true },
+        required: { type: Boolean, default: false },
+        answer: { type: String, default: '' }
+    }],
+    candidateProfile: {
+        name: { type: String, default: '' },
+        email: { type: String, default: '' },
+        location: {
+            district: { type: String, default: '' },
+            state: { type: String, default: '' }
+        },
+        education: {
+            qualification: { type: String, default: '' },
+            institutionName: { type: String, default: '' }
+        }
+    }
+}, { _id: false });
+
 const applicationSchema = new mongoose.Schema({
     internship: {
         type: mongoose.Schema.Types.ObjectId,
@@ -70,6 +128,13 @@ const applicationSchema = new mongoose.Schema({
     // Withdrawal audit metadata
     withdrawnAt: { type: Date },
     withdrawalReason: { type: String, trim: true, default: null },
+
+    // A denormalized, server-built record of exactly what was submitted.
+    // It is intentionally not a reference to the mutable candidate profile.
+    applicationKit: {
+        type: applicationKitSchema,
+        immutable: true
+    },
 
     notes: [{
         text: { type: String, required: true },
@@ -161,6 +226,10 @@ applicationSchema.statics.TERMINAL_STATUSES = TERMINAL_STATUSES;
 // Keep statusUpdatedAt correct regardless of which route changes the status.
 // Legacy records without the field are backfilled from appliedAt.
 applicationSchema.pre('save', function (next) {
+    if (!this.isNew && this.isModified('applicationKit')) {
+        return next(new Error('Submitted application kits are immutable.'));
+    }
+
     if (this.isNew || this.isModified('status')) {
         this.statusUpdatedAt = new Date();
     } else if (!this.statusUpdatedAt) {
@@ -168,5 +237,8 @@ applicationSchema.pre('save', function (next) {
     }
     if (typeof next === 'function') next();
 });
+
+// Prevent accidental duplicate applications even when two submissions race.
+applicationSchema.index({ internship: 1, candidate: 1 }, { unique: true });
 
 module.exports = mongoose.model("Application", applicationSchema);
