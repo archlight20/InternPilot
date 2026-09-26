@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const Internship = require('../models/Internship');
 const Notification = require('../models/Notification');
 const { parseISTEndOfDay } = require('./dateUtils');
+const { runSavedSearchDigests } = require('./notifications');
 
 const APPROACHING_DEADLINE_DAYS = parseInt(process.env.APPROACHING_DEADLINE_DAYS, 10) || 3;
 
@@ -69,3 +70,24 @@ cron.schedule('0 0 * * *', async () => {
         console.error('[Scheduler] Error checking deadlines:', error);
     }
 });
+
+// Saved-search digests run after the morning listing refresh in India. Instant
+// alerts are emitted from the publish paths; these jobs are only for users who
+// explicitly selected Daily or Weekly delivery.
+cron.schedule('0 9 * * *', async () => {
+    try {
+        await runSavedSearchDigests('daily');
+    } catch (error) {
+        console.error('[Scheduler] Error delivering daily saved-search digests:', error);
+    }
+}, { timezone: 'Asia/Kolkata' });
+
+cron.schedule('0 9 * * 1', async () => {
+    try {
+        await runSavedSearchDigests('weekly');
+    } catch (error) {
+        console.error('[Scheduler] Error delivering weekly saved-search digests:', error);
+    }
+}, { timezone: 'Asia/Kolkata' });
+
+module.exports = { runSavedSearchDigests };

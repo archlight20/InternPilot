@@ -1,6 +1,14 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const Internship = require('../models/Internship');
+const Application = require('../models/Application');
+const SavedSearch = require('../models/SavedSearch');
 const { skillNames } = require('./skillProfiles');
+const {
+    matchesInternshipCriteria,
+    buildSavedSearchResultsUrl
+} = require('./queryHelper');
+const { sendSavedSearchAlertEmail } = require('./sendEmail');
 
 function normalise(value) {
     return (value || '').trim().toLowerCase();
@@ -47,52 +55,296 @@ function isRelevantInternship(candidate, internship) {
         && hasQualificationMatch(candidate, internship);
 }
 
-async function notifyRelevantCandidates(internship) {
-    // A draft or closed listing must never appear as a new opportunity.
-    // Explicitly requiring "published" also keeps this safe if new listing
-    // states are introduced later.
-    if (!internship || internship.status !== 'published') return 0;
+function isOpenPublishedInternship(internship, now = new Date()) {
+    if (!internship || internship.status !== 'published' || internship.isPaused === true) return false;
+    if (!internship.applicationDeadline) return true;
+    const deadline = new Date(internship.applicationDeadline);
+    return Number.isNaN(deadline.getTime()) || deadline.getTime() >= now.getTime();
+}
 
+function identifier(value) {
+    return value && value._id ? String(value._id) : String(value || '');
+}
+
+function addSavedSearchMatch(groups, candidate, savedSearch) {
+    const key = identifier(candidate);
+    if (!key) return;
+    const group = groups.get(key) || { candidate, matches: [] };
+    group.matches.push(savedSearch);
+    groups.set(key, group);
+}
+
+async function notifyRelevantCandidates(internship) {
+    const now = new Date();
+    // A draft, closed, paused, or expired listing must never produce an alert.
+    if (!isOpenPublishedInternship(internship, now)) return 0;
+
+    const [candidates, savedSearches] = await Promise.all([
+        User.find({ role: 'candidate', isEmailVerified: true, isActive: true })
+            .select('_id name email skills skillProfiles location education')
+            .lean(),
+        SavedSearch.find({ isPaused: false, frequency: { $ne: 'off' } }).lean()
+    ]);
+
+    const candidatesById = new Map(candidates.map(candidate => [identifier(candidate), candidate]));
+    const profileMatches = new Set(
+        candidates.filter(candidate => isRelevantInternship(candidate, internship)).map(identifier)
+    );
+    const savedMatchesByCandidate = new Map();
+
+    savedSearches.forEach(savedSearch => {
+        const candidate = candidatesById.get(identifier(savedSearch.candidate));
+        if (!candidate || !matchesInternshipCriteria(internship, savedSearch.criteria, now)) return;
+        addSavedSearchMatch(savedMatchesByCandidate, candidate, savedSearch);
+    });
+
+    // Group by candidate so profile matching and multiple saved searches never
+    // produce duplicate in-app notifications for one published listing.
+    const immediateRecipients = new Map();
+    profileMatches.forEach(candidateId => {
+        const candidate = candidatesById.get(candidateId);
+        if (candidate) immediateRecipients.set(candidateId, { candidate, savedMatches: [], profileMatch: true });
+    });
+
+    const inAppSavedSearchIds = [];
+    savedMatchesByCandidate.forEach((group, candidateId) => {
+        const instantInAppMatches = group.matches.filter(search =>
+            search.frequency === 'instant' && search.delivery?.inApp !== false
+        );
+        if (!instantInAppMatches.length) return;
+
+        const recipient = immediateRecipients.get(candidateId) || {
+            candidate: group.candidate,
+            savedMatches: [],
+            profileMatch: false
+        };
+        recipient.savedMatches.push(...instantInAppMatches);
+        immediateRecipients.set(candidateId, recipient);
+        inAppSavedSearchIds.push(...instantInAppMatches.map(search => search._id));
+    });
+
+    if (immediateRecipients.size) {
+        const operations = [...immediateRecipients.values()].map(({ candidate, savedMatches, profileMatch }) => {
+            const savedNames = [...new Set(savedMatches.map(search => search.name).filter(Boolean))];
+            const matchMessage = profileMatch
+                ? `${internship.title} at ${internship.companyName} matches your profile.`
+                : `${internship.title} at ${internship.companyName} matches your saved search${savedNames.length === 1 ? ` “${savedNames[0]}”` : 'es'}.`;
+
+            return {
+                updateOne: {
+                    filter: {
+                        recipient: candidate._id,
+                        internship: internship._id,
+                        type: 'new_matching_internship'
+                    },
+                    update: {
+                        $setOnInsert: {
+                            recipient: candidate._id,
+                            type: 'new_matching_internship',
+                            title: 'New internship match',
+                            message: matchMessage,
+                            link: savedMatches.length ? buildSavedSearchResultsUrl(savedMatches[0].criteria) : '/internships',
+                            internship: internship._id,
+                            isRead: false
+                        }
+                    },
+                    upsert: true
+                }
+            };
+        });
+
+        await Notification.bulkWrite(operations, { ordered: false });
+    }
+
+    // Email-only and "both" instant alerts are sent once per candidate/listing
+    // even when more than one saved search matches.
+    const emailSearchIds = [];
+    const emailRecipients = [...savedMatchesByCandidate.values()].map(async group => {
+        const matchingSearches = group.matches.filter(search =>
+            search.frequency === 'instant' && search.delivery?.email === true
+        );
+        if (!matchingSearches.length || !group.candidate.email) return;
+
+        try {
+            await sendSavedSearchAlertEmail(
+                group.candidate.email,
+                group.candidate.name,
+                matchingSearches.map(search => search.name),
+                [internship],
+                'instant',
+                buildSavedSearchResultsUrl(matchingSearches[0].criteria)
+            );
+            emailSearchIds.push(...matchingSearches.map(search => search._id));
+        } catch (error) {
+            // E-mail delivery must not make publishing an internship fail; the
+            // in-app notification remains available when the candidate chose it.
+            console.error('Failed to send saved-search instant alert:', error.message);
+        }
+    });
+    await Promise.all(emailRecipients);
+
+    const deliveredSearchIds = [...new Set([...inAppSavedSearchIds, ...emailSearchIds].map(identifier).filter(Boolean))];
+    if (deliveredSearchIds.length) {
+        await SavedSearch.updateMany(
+            { _id: { $in: deliveredSearchIds } },
+            { $set: { lastAlertAt: now } }
+        );
+    }
+
+    const alertedCandidateIds = new Set([
+        ...immediateRecipients.keys(),
+        ...[...savedMatchesByCandidate.entries()]
+            .filter(([, group]) => group.matches.some(search => search.frequency === 'instant' && search.delivery?.email === true))
+            .map(([candidateId]) => candidateId)
+    ]);
+    return alertedCandidateIds.size;
+}
+
+function timestampFromInternship(internship) {
+    if (internship?.createdAt) {
+        const value = new Date(internship.createdAt);
+        if (!Number.isNaN(value.getTime())) return value;
+    }
+    if (internship?._id && typeof internship._id.getTimestamp === 'function') return internship._id.getTimestamp();
+    return null;
+}
+
+function digestKey(frequency, now) {
+    const date = new Date(now);
+    return `${frequency}:${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Delivers a candidate-level digest for daily or weekly saved searches. It is
+ * exported so scheduler behavior can be exercised without waiting for cron.
+ *
+ * @param {'daily'|'weekly'} frequency
+ * @param {Date} [now]
+ * @returns {Promise<number>} number of candidate digests created
+ */
+async function runSavedSearchDigests(frequency, now = new Date()) {
+    if (!['daily', 'weekly'].includes(frequency)) return 0;
+
+    const [savedSearches, internships] = await Promise.all([
+        SavedSearch.find({ frequency, isPaused: false }).lean(),
+        Internship.find({
+            status: 'published',
+            isPaused: { $ne: true },
+            $or: [
+                { applicationDeadline: { $exists: false } },
+                { applicationDeadline: null },
+                { applicationDeadline: { $gte: now } }
+            ]
+        }).lean()
+    ]);
+    if (!savedSearches.length) return 0;
+
+    const candidateIds = [...new Set(savedSearches.map(search => identifier(search.candidate)).filter(Boolean))];
     const candidates = await User.find({
+        _id: { $in: candidateIds },
         role: 'candidate',
         isEmailVerified: true,
         isActive: true
-    })
-        .select('_id skills skillProfiles location education')
-        .lean();
+    }).select('_id name email').lean();
+    const candidatesById = new Map(candidates.map(candidate => [identifier(candidate), candidate]));
+    const allInternshipIds = internships.map(internship => internship._id);
+    const applications = allInternshipIds.length
+        ? await Application.find({
+            candidate: { $in: candidateIds },
+            internship: { $in: allInternshipIds }
+        }).select('candidate internship').lean()
+        : [];
+    const appliedByCandidate = new Map();
+    applications.forEach(application => {
+        const candidateId = identifier(application.candidate);
+        const applied = appliedByCandidate.get(candidateId) || new Set();
+        applied.add(identifier(application.internship));
+        appliedByCandidate.set(candidateId, applied);
+    });
 
-    const matchingCandidates = candidates.filter(candidate => isRelevantInternship(candidate, internship));
-    if (!matchingCandidates.length) return 0;
+    const grouped = new Map();
+    savedSearches.forEach(savedSearch => {
+        const candidate = candidatesById.get(identifier(savedSearch.candidate));
+        if (!candidate) return;
+        const since = new Date(savedSearch.lastDigestAt || savedSearch.alertStartAt || savedSearch.createdAt || now);
+        const safeSince = Number.isNaN(since.getTime()) ? now : since;
+        const alreadyApplied = appliedByCandidate.get(identifier(candidate)) || new Set();
+        const matches = internships.filter(internship => {
+            const publishedAt = timestampFromInternship(internship);
+            return publishedAt && publishedAt.getTime() > safeSince.getTime()
+                && !alreadyApplied.has(identifier(internship))
+                && matchesInternshipCriteria(internship, savedSearch.criteria, now);
+        });
+        if (!matches.length) return;
 
-    const title = 'New internship match';
-    const message = `${internship.title} at ${internship.companyName} matches your profile.`;
+        const candidateId = identifier(candidate);
+        const entry = grouped.get(candidateId) || { candidate, searches: [] };
+        entry.searches.push({ savedSearch, matches });
+        grouped.set(candidateId, entry);
+    });
 
-    await Notification.bulkWrite(
-        matchingCandidates.map(candidate => ({
-            updateOne: {
-                filter: {
+    let delivered = 0;
+    for (const { candidate, searches } of grouped.values()) {
+        const searchNames = [...new Set(searches.map(entry => entry.savedSearch.name).filter(Boolean))];
+        const internshipsForDigest = [...new Map(
+            searches.flatMap(entry => entry.matches).map(internship => [identifier(internship), internship])
+        ).values()];
+        const wantsInApp = searches.some(entry => entry.savedSearch.delivery?.inApp !== false);
+        const wantsEmail = searches.some(entry => entry.savedSearch.delivery?.email === true);
+        const message = `${internshipsForDigest.length} new internship${internshipsForDigest.length === 1 ? '' : 's'} match your ${frequency} saved searches.`;
+        const key = digestKey(frequency, now);
+
+        if (wantsInApp) {
+            await Notification.updateOne(
+                {
                     recipient: candidate._id,
-                    internship: internship._id,
-                    type: 'new_matching_internship'
+                    type: 'saved_search_digest',
+                    'metadata.digestKey': key
                 },
-                update: {
+                {
                     $setOnInsert: {
                         recipient: candidate._id,
-                        type: 'new_matching_internship',
-                        title,
+                        type: 'saved_search_digest',
+                        title: `${frequency[0].toUpperCase()}${frequency.slice(1)} internship matches`,
                         message,
-                        link: '/internships',
-                        internship: internship._id,
+                        link: '/candidate/saved-searches',
+                        metadata: {
+                            digestKey: key,
+                            internshipCount: internshipsForDigest.length,
+                            searchNames
+                        },
                         isRead: false
                     }
                 },
-                upsert: true
-            }
-        })),
-        { ordered: false }
-    );
+                { upsert: true }
+            );
+        }
 
-    return matchingCandidates.length;
+        if (wantsEmail && candidate.email) {
+            try {
+                await sendSavedSearchAlertEmail(
+                    candidate.email,
+                    candidate.name,
+                    searchNames,
+                    internshipsForDigest,
+                    frequency,
+                    '/candidate/saved-searches'
+                );
+            } catch (error) {
+                console.error('Failed to send saved-search digest:', error.message);
+            }
+        }
+
+        if (wantsInApp || wantsEmail) delivered += 1;
+    }
+
+    // Move each requested digest window forward even when no listing matched;
+    // this prevents a future run from scanning the same historical window.
+    await SavedSearch.updateMany(
+        { _id: { $in: savedSearches.map(search => search._id) } },
+        { $set: { lastDigestAt: now } }
+    );
+    return delivered;
 }
 
 async function notifyApplicationStatusChange(application, internship, status) {
@@ -150,6 +402,7 @@ async function notifyInterviewCancelled(application, internship) {
 module.exports = {
     isRelevantInternship,
     notifyRelevantCandidates,
+    runSavedSearchDigests,
     notifyApplicationStatusChange,
     notifyInterviewScheduled,
     notifyInterviewRescheduled,

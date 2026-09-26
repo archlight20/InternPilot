@@ -309,10 +309,97 @@ const sendInterviewCancelledEmail = async (email, candidateName, internshipTitle
     return await sendWithRetry(mailOptions);
 };
 
+/**
+ * Sends either one instant saved-search alert or a daily/weekly digest. The
+ * caller passes server-owned search names and internship records; every value
+ * is escaped here so listing content cannot become email HTML.
+ *
+ * @param {string} email
+ * @param {string} candidateName
+ * @param {string[]} searchNames
+ * @param {Array<{title?: string, companyName?: string}>} internships
+ * @param {'instant'|'daily'|'weekly'} frequency
+ * @param {string} resultsPath A relative InternPilot results path.
+ * @returns {Promise<Object>}
+ */
+const sendSavedSearchAlertEmail = async (
+    email,
+    candidateName,
+    searchNames = [],
+    internships = [],
+    frequency = 'instant',
+    resultsPath = '/internships'
+) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail || !isValidEmail(cleanEmail)) throw new Error('Invalid email address.');
+
+    const safeSearchNames = [...new Set((Array.isArray(searchNames) ? searchNames : [])
+        .map(name => String(name || '').trim())
+        .filter(Boolean))];
+    const safeInternships = (Array.isArray(internships) ? internships : [])
+        .filter(Boolean)
+        .slice(0, 10);
+    const isDigest = frequency === 'daily' || frequency === 'weekly';
+    const cadence = frequency === 'weekly' ? 'weekly' : 'daily';
+    const intro = isDigest
+        ? `Here is your ${cadence} saved-search digest.`
+        : 'A new internship matches one of your saved searches.';
+    const searchContext = safeSearchNames.length
+        ? `Matching search${safeSearchNames.length === 1 ? '' : 'es'}: ${safeSearchNames.join(', ')}`
+        : 'A saved search matched this opportunity.';
+    const listingRows = safeInternships.map(internship => {
+        const title = escapeHtml(internship.title || 'Internship opportunity');
+        const company = escapeHtml(internship.companyName || internship.company || 'InternPilot partner');
+        return `<li style="margin: 0 0 8px;"><strong>${title}</strong> at ${company}</li>`;
+    }).join('');
+
+    let resultsUrl = '';
+    const configuredBase = sanitizeHttpUrl(process.env.APP_URL || '').url;
+    if (configuredBase && typeof resultsPath === 'string' && resultsPath.startsWith('/')) {
+        try {
+            resultsUrl = new URL(resultsPath, configuredBase).toString();
+        } catch (error) {
+            // The email remains useful without a deep link when APP_URL is malformed.
+            resultsUrl = '';
+        }
+    }
+
+    const senderEmail = process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@internpilot.com';
+    const button = resultsUrl
+        ? `<a href="${escapeHtml(resultsUrl)}" style="display:inline-block;background:#4f46e5;color:#ffffff;padding:10px 16px;border-radius:7px;text-decoration:none;font-weight:700;font-size:14px;">View matching internships</a>`
+        : '<p>Sign in to InternPilot to view your matching internships.</p>';
+    const textListings = safeInternships.map(internship =>
+        `- ${internship.title || 'Internship opportunity'} at ${internship.companyName || internship.company || 'InternPilot partner'}`
+    ).join('\n');
+
+    const mailOptions = {
+        from: `"InternPilot Alerts" <${senderEmail}>`,
+        to: cleanEmail,
+        subject: isDigest
+            ? `Your ${cadence} InternPilot internship matches`
+            : 'New internship match from your saved search',
+        text: `Hi ${candidateName || 'there'},\n\n${intro}\n${searchContext}\n\n${textListings || 'Open InternPilot to view your matching internships.'}\n${resultsUrl ? `\nView results: ${resultsUrl}` : ''}`,
+        html: `
+            <div style="font-family:Arial,sans-serif;padding:20px;color:#334155;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:10px;">
+                <h2 style="color:#4f46e5;margin-top:0;">InternPilot</h2>
+                <p>Hi <strong>${escapeHtml(candidateName || 'there')}</strong>,</p>
+                <p>${escapeHtml(intro)}</p>
+                <p style="color:#475569;font-size:14px;">${escapeHtml(searchContext)}</p>
+                ${listingRows ? `<ul style="padding-left:20px;line-height:1.5;">${listingRows}</ul>` : ''}
+                <div style="margin:24px 0 8px;">${button}</div>
+                <p style="font-size:12px;color:#64748b;margin-top:30px;">Manage or pause alerts at any time from Saved Searches in InternPilot.</p>
+            </div>
+        `
+    };
+
+    return sendWithRetry(mailOptions);
+};
+
 module.exports = {
     sendOTPEmail,
     sendStatusUpdateEmail,
     sendInterviewScheduledEmail,
     sendInterviewRescheduledEmail,
-    sendInterviewCancelledEmail
+    sendInterviewCancelledEmail,
+    sendSavedSearchAlertEmail
 };
