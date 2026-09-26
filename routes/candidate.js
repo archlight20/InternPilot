@@ -138,6 +138,43 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
 });
 
 /**
+ * GET /candidate/applications/:id/kit
+ *
+ * Shows the immutable, server-recorded Application Kit for the signed-in
+ * candidate. Querying by both _id and candidate is deliberate: an
+ * application identifier must never reveal another candidate's submission.
+ */
+router.get('/candidate/applications/:id/kit', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        const candidateId = req.user._id || req.user.id;
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            if (req.flash) req.flash('error_msg', 'Application not found.');
+            return res.redirect('/candidate/applications');
+        }
+
+        const application = await Application.findOne({
+            _id: req.params.id,
+            candidate: candidateId
+        }).populate('internship');
+
+        if (!application) {
+            if (req.flash) req.flash('error_msg', 'Application not found.');
+            return res.redirect('/candidate/applications');
+        }
+
+        return res.render('candidate/application-kit-submission', {
+            application,
+            internship: application.internship,
+            currentUser: req.user
+        });
+    } catch (error) {
+        console.error('Error loading submitted application kit:', error);
+        if (req.flash) req.flash('error_msg', 'Unable to load the submitted application kit.');
+        return res.redirect('/candidate/applications');
+    }
+});
+
+/**
  * Core withdrawal logic handler.
  * Supports both POST and PATCH methods for /candidate/applications/:id/withdraw.
  */

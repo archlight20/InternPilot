@@ -359,13 +359,23 @@
 
                     <% } else { %>
                         <!-- ACTIVE & OPEN -->
-                        <form action="/internships/<%= internship._id %>/apply" method="POST">
-                            <button type="submit"
-                                class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer">
-                                <i class="ph-bold ph-paper-plane-tilt text-lg"></i>
-                                Apply Now
-                            </button>
-                        </form>
+                        <% const requiresApplicationKit = Array.isArray(internship.applicationQuestions) && internship.applicationQuestions.some(question => question && question.prompt); %>
+                        <a href="/internships/<%= internship._id %>/application-kit"
+                            class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer">
+                            <i class="ph-bold ph-briefcase text-lg"></i>
+                            <%= requiresApplicationKit ? 'Prepare Application Kit' : 'Tailor Application' %>
+                        </a>
+                        <% if (requiresApplicationKit) { %>
+                            <p class="mt-2 text-center text-xs text-slate-500">This role includes questions from the hiring team.</p>
+                        <% } else { %>
+                            <form action="/internships/<%= internship._id %>/apply" method="POST">
+                                <button type="submit"
+                                    class="mt-2 w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer">
+                                    <i class="ph-bold ph-paper-plane-tilt text-lg"></i>
+                                    Quick Apply
+                                </button>
+                            </form>
+                        <% } %>
                     <% } %>
                 </div>
             <% } %>

@@ -204,15 +204,25 @@
                                             class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
                                             <i class="ph-bold ph-user text-sm"></i> View Profile
                                         </a>
+                                        <% if (app.applicationKit) { %>
+                                            <a href="/company/applications/<%= app._id %>/candidate#submitted-application-kit"
+                                                class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                                                <i class="ph-bold ph-briefcase text-sm"></i> Submitted Kit
+                                            </a>
+                                        <% } %>
                                         <% if (typeof messageUnreadCount !== 'undefined') { %><%- include('../partials/message-start-button', { application: app, label: 'Message ' + ((app.candidate && app.candidate.name) || 'candidate'), compact: true }) %><% } %>
 
                                         <!-- Candidate Resume Button -->
-                                        <% const resumePath=app.candidate ? (app.candidate.resume ||
-                                            app.candidate.resumeUrl) : null; %>
+                                        <% const submittedResumePath = app.applicationKit && app.applicationKit.resume
+                                            ? ((app.applicationKit.resume.fileUrl || '').startsWith('/uploads/')
+                                                ? app.applicationKit.resume.fileUrl
+                                                : sanitizeHttpUrl(app.applicationKit.resume.fileUrl).url)
+                                            : ''; %>
+                                        <% const resumePath = submittedResumePath || (app.candidate ? (app.candidate.resume || app.candidate.resumeUrl) : null); %>
                                             <% if (resumePath) { %>
                                                 <a href="<%= resumePath %>" target="_blank"
                                                     class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
-                                                    <i class="ph-bold ph-file-pdf text-sm"></i> Resume
+                                                    <i class="ph-bold ph-file-pdf text-sm"></i> <%= submittedResumePath ? 'Submitted Resume' : 'Resume' %>
                                                 </a>
                                                 <% } else { %>
                                                     <span

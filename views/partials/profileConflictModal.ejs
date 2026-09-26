@@ -63,6 +63,9 @@
             <% if (typeof resumeOriginalName !== 'undefined' && resumeOriginalName) { %>
                 <input type="hidden" name="resumeOriginalName" value="<%= resumeOriginalName %>">
             <% } %>
+            <% if (typeof resumeVersionLabel !== 'undefined' && resumeVersionLabel) { %>
+                <input type="hidden" name="resumeVersionLabel" value="<%= resumeVersionLabel %>">
+            <% } %>
 
             <!-- Quick-select buttons -->
             <div class="px-6 pt-4 pb-2 flex flex-wrap gap-2 shrink-0">

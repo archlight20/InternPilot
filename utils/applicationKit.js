@@ -28,6 +28,20 @@ function cleanText(value, maxLength) {
     return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
+// Uploaded profile documents can be stored locally during development, while
+// externally hosted documents must still pass the normal safe-URL allowlist.
+// Never accept arbitrary relative paths from profile fields.
+function safeStoredFileUrl(value) {
+    const raw = cleanText(value, 2000);
+    if (!raw) return '';
+    if (/^\/uploads\/(?:resumes|documents)\//.test(raw)) return raw;
+    return sanitizeHttpUrl(raw).url;
+}
+
+function toBoolean(value) {
+    return value === true || value === 1 || value === '1' || value === 'true' || value === 'on';
+}
+
 function uniqueStrings(values, limit = MAX_SELECTED_ITEMS) {
     const unique = [];
     const seen = new Set();
@@ -90,7 +104,7 @@ function parseApplicationQuestions(body = {}) {
         if (!prompt) return;
 
         const required = typeof value === 'object' && value !== null && value.required !== undefined
-            ? Boolean(value.required)
+            ? toBoolean(value.required)
             : requiredIndexes.has(String(index));
 
         normalized.push({
@@ -130,7 +144,7 @@ function getResumeVersions(candidate) {
     const seenUrls = new Set();
 
     asArray(candidate && candidate.resumeVersions).forEach(version => {
-        const fileUrl = sanitizeHttpUrl(version && (version.fileUrl || version.url)).url;
+        const fileUrl = safeStoredFileUrl(version && (version.fileUrl || version.url));
         if (!fileUrl) return;
         seenUrls.add(fileUrl);
         versions.push({
@@ -142,7 +156,7 @@ function getResumeVersions(candidate) {
         });
     });
 
-    const legacyUrl = sanitizeHttpUrl(candidate && candidate.resume).url;
+    const legacyUrl = safeStoredFileUrl(candidate && candidate.resume);
     if (legacyUrl && !seenUrls.has(legacyUrl)) {
         versions.unshift({
             sourceId: 'legacy',
@@ -210,7 +224,7 @@ function snapshotProject(project) {
         description: cleanText(project && project.description, 1000),
         link: sanitizeHttpUrl(project && project.link).url,
         techStack: uniqueStrings(project && project.techStack, 20),
-        fileUrl: sanitizeHttpUrl(project && project.fileUrl).url,
+        fileUrl: safeStoredFileUrl(project && project.fileUrl),
         fileName: cleanText(project && project.fileName, 180)
     };
 }
@@ -226,7 +240,7 @@ function snapshotCertification(certification) {
         issuer: cleanText(certification && certification.issuer, 120),
         issueDate: issueDate && !Number.isNaN(issueDate.getTime()) ? issueDate : undefined,
         link: sanitizeHttpUrl(certification && certification.link).url,
-        fileUrl: sanitizeHttpUrl(certification && certification.fileUrl).url,
+        fileUrl: safeStoredFileUrl(certification && certification.fileUrl),
         fileName: cleanText(certification && certification.fileName, 180)
     };
 }

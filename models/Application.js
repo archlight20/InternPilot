@@ -238,6 +238,25 @@ applicationSchema.pre('save', function (next) {
     if (typeof next === 'function') next();
 });
 
+// Route handlers normally modify a document and call `.save()`, but protect
+// the immutable snapshot from query-based updates as well. This prevents a
+// future endpoint from silently changing historical submitted material.
+function rejectApplicationKitQueryMutation(next) {
+    const update = this.getUpdate ? this.getUpdate() : {};
+    const mutatesKit = value => Object.keys(value || {}).some(key => key === 'applicationKit' || key.startsWith('applicationKit.'));
+    const hasKitMutation = mutatesKit(update)
+        || ['$set', '$unset', '$push', '$pull', '$addToSet', '$setOnInsert'].some(operator => mutatesKit(update && update[operator]));
+
+    if (hasKitMutation) {
+        const error = new Error('Submitted application kits are immutable.');
+        if (typeof next === 'function') return next(error);
+        throw error;
+    }
+    if (typeof next === 'function') return next();
+}
+
+applicationSchema.pre(['updateOne', 'updateMany', 'findOneAndUpdate'], rejectApplicationKitQueryMutation);
+
 // Prevent accidental duplicate applications even when two submissions race.
 applicationSchema.index({ internship: 1, candidate: 1 }, { unique: true });
 
