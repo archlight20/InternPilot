@@ -29,6 +29,14 @@ const {
 const { calculateCandidateMatch } = require('../utils/candidateMatcher');
 const { buildSkillProfiles } = require('../utils/skillProfiles');
 
+function notifyPublishedInternship(internship) {
+    if (typeof notifyRelevantCandidates !== 'function') return;
+
+    notifyRelevantCandidates(internship).catch(error => {
+        console.error('Failed to create internship match notifications:', error);
+    });
+}
+
 router.get('/', async (req, res) => {
     try {
         const parsed = parseInternshipQuery(req.query);
@@ -223,11 +231,7 @@ router.post('/new', isAuthenticated, requireCompanyPermission('internship:create
 
         await newInternship.save();
 
-        if (status === 'published' && typeof notifyRelevantCandidates === 'function') {
-            notifyRelevantCandidates(newInternship).catch(err => {
-                console.error('Failed to create internship match notifications:', err);
-            });
-        }
+        if (status === 'published') notifyPublishedInternship(newInternship);
 
         if (req.flash) {
             if (isDraft) {
@@ -459,9 +463,12 @@ router.post('/:id/resume', isAuthenticated, requireCompanyPermission('internship
             return res.redirect('/internships');
         }
 
+        const becamePublished = internship.status !== 'published' || internship.isPaused === true;
         internship.status = 'published';
         internship.isPaused = false;
         await internship.save();
+
+        if (becamePublished) notifyPublishedInternship(internship);
 
         if (typeof chatRouter !== 'undefined' && typeof chatRouter.invalidateChatCache === 'function') {
             chatRouter.invalidateChatCache();
@@ -509,6 +516,8 @@ router.post('/:id/toggle-pause', isAuthenticated, requireCompanyPermission('inte
             internship.isPaused = false;
         }
         await internship.save();
+
+        if (!willPause) notifyPublishedInternship(internship);
 
         if (typeof chatRouter !== 'undefined' && typeof chatRouter.invalidateChatCache === 'function') {
             chatRouter.invalidateChatCache();

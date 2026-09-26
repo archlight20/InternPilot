@@ -347,6 +347,17 @@ function digestPayload(entries) {
     return { searchNames, internships };
 }
 
+// A digest can contain matches from more than one saved search. Use the first
+// matching search as its destination instead of sending candidates to the
+// generic saved-search management page. This keeps the alert actionable: the
+// result page opens with the same filters that produced the match.
+function digestResultsPath(entries) {
+    const entry = (Array.isArray(entries) ? entries : []).find(item => item?.savedSearch?.criteria);
+    return entry
+        ? buildSavedSearchResultsUrl(entry.savedSearch.criteria)
+        : '/internships?status=active';
+}
+
 function shouldAdvanceDigestCheckpoint(savedSearch, { hasMatches, inAppDelivered, emailDelivered }) {
     if (!hasMatches) return true;
 
@@ -439,6 +450,7 @@ async function runSavedSearchDigests(frequency, now = new Date()) {
 
         if (inAppEntries.length) {
             const { searchNames, internships: internshipsForDigest } = digestPayload(inAppEntries);
+            const resultsPath = digestResultsPath(inAppEntries);
             const message = `${internshipsForDigest.length} new internship${internshipsForDigest.length === 1 ? '' : 's'} match your ${frequency} saved searches.`;
             try {
                 await Notification.updateOne(
@@ -453,9 +465,10 @@ async function runSavedSearchDigests(frequency, now = new Date()) {
                             type: 'saved_search_digest',
                             title: `${frequency[0].toUpperCase()}${frequency.slice(1)} internship matches`,
                             message,
-                            link: '/candidate/saved-searches',
+                            link: resultsPath,
                             metadata: {
                                 digestKey: key,
+                                savedSearchId: inAppEntries[0].savedSearch._id,
                                 internshipCount: internshipsForDigest.length,
                                 searchNames
                             },
@@ -485,7 +498,7 @@ async function runSavedSearchDigests(frequency, now = new Date()) {
                     searchNames,
                     internshipsForDigest,
                     frequency,
-                    '/candidate/saved-searches'
+                    digestResultsPath(emailEntries)
                 );
                 emailDelivered = true;
             } catch (error) {
@@ -579,6 +592,7 @@ module.exports = {
     mapWithConcurrency,
     publicationTimestampFromInternship,
     shouldAdvanceDigestCheckpoint,
+    digestResultsPath,
     notifyApplicationStatusChange,
     notifyInterviewScheduled,
     notifyInterviewRescheduled,

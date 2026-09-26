@@ -6,7 +6,8 @@ const {
     notifyRelevantCandidates,
     mapWithConcurrency,
     publicationTimestampFromInternship,
-    shouldAdvanceDigestCheckpoint
+    shouldAdvanceDigestCheckpoint,
+    digestResultsPath
 } = require('../utils/notifications');
 
 const matchingCandidate = {
@@ -86,4 +87,20 @@ test('keeps an email-only digest window open when e-mail delivery fails', () => 
         inAppDelivered: false,
         emailDelivered: false
     }), true);
+});
+
+test('digest alerts open the result page with the matching saved filters', () => {
+    const path = digestResultsPath([{
+        savedSearch: {
+            criteria: { search: 'JavaScript', location: 'Pune', skills: ['MongoDB'] }
+        },
+        matches: []
+    }]);
+
+    const url = new URL(path, 'http://internpilot.test');
+    assert.equal(url.pathname, '/internships');
+    assert.equal(url.searchParams.get('status'), 'active');
+    assert.equal(url.searchParams.get('search'), 'JavaScript');
+    assert.equal(url.searchParams.get('location'), 'Pune');
+    assert.equal(url.searchParams.get('skills'), 'MongoDB');
 });
