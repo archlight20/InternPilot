@@ -329,3 +329,43 @@ test('candidate-profile.ejs renders Incomplete badge and lists missing fields wi
     assert.match(html, /Annual family income is not specified/);
 });
 
+test('candidate-profile.ejs renders updated employmentStatus, enrollmentStatus and PMIS status accurately', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const ejs = require('ejs');
+
+    const templatePath = path.join(__dirname, '..', 'views', 'candidate', 'candidate-profile.ejs');
+    const rawTemplate = fs.readFileSync(templatePath, 'utf8')
+        .replace("<% layout('layouts/boilerplate') %>", '');
+
+    const candidate = {
+        name: 'naya_ladka',
+        age: 24,
+        familyIncome: 100000,
+        education: { qualification: 'B.Tech', institutionName: 'IIT delhi' },
+        enrollmentStatus: 'not_enrolled',
+        employmentStatus: 'full_time',
+        location: { district: 'Noida', state: 'Uttar Pradesh' },
+        skills: ['JavaScript']
+    };
+
+    const eligibility = checkPmisEligibility(candidate);
+
+    const html = ejs.render(rawTemplate, {
+        candidate,
+        user: candidate,
+        activeUser: candidate,
+        eligibility,
+        pmisRules: PMIS_RULES,
+        success_msg: null,
+        error_msg: null,
+        showConflictModal: false
+    });
+
+    assert.match(html, /Not Eligible/);
+    assert.match(html, /Full-time Employed/);
+    assert.match(html, /Not Enrolled \/ Completed/);
+    assert.match(html, /Candidates currently engaged in full-time regular employment are not eligible/);
+});
+
+

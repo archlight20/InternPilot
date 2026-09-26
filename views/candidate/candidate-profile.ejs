@@ -4,9 +4,11 @@
         user) ? user : currentUser); %>
     <% const profileSkillEntries = (typeof skillProfiles !== 'undefined' && Array.isArray(skillProfiles) && skillProfiles.length)
         ? skillProfiles
-        : ((activeUser && Array.isArray(activeUser.skills))
-            ? activeUser.skills.map(name => ({ name, proficiency: 'Intermediate' }))
-            : []); %>
+        : ((activeUser && Array.isArray(activeUser.skillProfiles) && activeUser.skillProfiles.length)
+            ? activeUser.skillProfiles
+            : ((activeUser && Array.isArray(activeUser.skills))
+                ? activeUser.skills.map(name => ({ name, proficiency: 'Intermediate' }))
+                : [])); %>
 
     <% 
     let resumeDisplayName = '';
@@ -713,126 +715,140 @@
             <%- include('../partials/profileConflictModal') %>
         <% } %>
 
+<style>
+    .invisible-scrollbar {
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
+    }
+    .invisible-scrollbar::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+</style>
+
         <div id="editProfileModal"
             class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-            <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl relative max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+                <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 shrink-0">
                     <h3 class="text-base font-bold text-slate-900">Update Profile Details</h3>
                     <button id="closeModalBtn" type="button"
-                        class="text-slate-400 hover:text-slate-600 p-1 text-lg font-bold">
+                        class="text-slate-400 hover:text-slate-600 p-1 text-lg font-bold cursor-pointer">
                         ✕
                     </button>
                 </div>
 
-                <form id="editProfileForm" action="/candidate/profile/edit" method="POST" class="mt-4 space-y-3 text-xs">
-                    <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Location (District, State)</label>
-                        <input type="text" name="location"
-                            value="<%= (activeUser && activeUser.location) ? (typeof activeUser.location === 'object' ? [activeUser.location.district, activeUser.location.state].filter(Boolean).join(', ') : activeUser.location) : '' %>"
-                            placeholder="e.g. Noida, Uttar Pradesh"
-                            class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
+                <form id="editProfileForm" action="/candidate/profile/edit" method="POST" class="flex flex-col flex-1 overflow-hidden min-h-0 text-xs">
+                    <div class="flex-1 overflow-y-auto invisible-scrollbar px-6 py-4 space-y-3" style="scrollbar-width: none; -ms-overflow-style: none;">
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Age</label>
-                            <input type="number" name="age" id="editAge"
-                                value="<%= (activeUser && activeUser.age && activeUser.age > 0) ? activeUser.age : '' %>" placeholder="21-24"
-                                min="15" max="60"
+                            <label class="block font-semibold text-slate-700 mb-1">Location (District, State)</label>
+                            <input type="text" name="location"
+                                value="<%= (activeUser && activeUser.location) ? (typeof activeUser.location === 'object' ? [activeUser.location.district, activeUser.location.state].filter(Boolean).join(', ') : activeUser.location) : '' %>"
+                                placeholder="e.g. Noida, Uttar Pradesh"
+                                class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Age</label>
+                                <input type="number" name="age" id="editAge"
+                                    value="<%= (activeUser && activeUser.age && activeUser.age > 0) ? activeUser.age : '' %>" placeholder="21-24"
+                                    min="15" max="60"
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Family Income (₹/year)</label>
+                                <input type="number" name="familyIncome" id="editFamilyIncome"
+                                    value="<%= (activeUser && activeUser.familyIncome !== undefined && activeUser.familyIncome !== null && activeUser.familyIncome !== '') ? activeUser.familyIncome : '' %>"
+                                    placeholder="e.g. 350000"
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">Highest Qualification</label>
+                            <input type="text" name="qualification" id="editQualification"
+                                value="<%= (activeUser && activeUser.education && activeUser.education.qualification) ? activeUser.education.qualification : ((activeUser && activeUser.qualification) ? activeUser.qualification : '') %>"
+                                placeholder="e.g. B.Tech / B.Sc"
                                 class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
                         </div>
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Family Income (₹/year)</label>
-                            <input type="number" name="familyIncome" id="editFamilyIncome"
-                                value="<%= (activeUser && activeUser.familyIncome !== undefined && activeUser.familyIncome !== null && activeUser.familyIncome !== '') ? activeUser.familyIncome : '' %>"
-                                placeholder="e.g. 350000"
+                            <label class="block font-semibold text-slate-700 mb-1">Institution Name</label>
+                            <input type="text" name="institution"
+                                value="<%= (activeUser && activeUser.institution) ? activeUser.institution : '' %>"
+                                placeholder="e.g. Delhi University"
                                 class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
                         </div>
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Highest Qualification</label>
-                        <input type="text" name="qualification" id="editQualification"
-                            value="<%= (activeUser && activeUser.education && activeUser.education.qualification) ? activeUser.education.qualification : ((activeUser && activeUser.qualification) ? activeUser.qualification : '') %>"
-                            placeholder="e.g. B.Tech / B.Sc"
-                            class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Institution Name</label>
-                        <input type="text" name="institution"
-                            value="<%= (activeUser && activeUser.institution) ? activeUser.institution : '' %>"
-                            placeholder="e.g. Delhi University"
-                            class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Formal Education Enrollment</label>
-                            <select name="enrollmentStatus" id="editEnrollmentStatus"
-                                class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none bg-white">
-                                <option value="">Select Enrollment...</option>
-                                <option value="not_enrolled" <%= (activeUser && activeUser.enrollmentStatus === 'not_enrolled') ? 'selected' : '' %>>Not Enrolled / Completed</option>
-                                <option value="part_time_or_distance" <%= (activeUser && activeUser.enrollmentStatus === 'part_time_or_distance') ? 'selected' : '' %>>Part-time / Distance Learning</option>
-                                <option value="full_time" <%= (activeUser && activeUser.enrollmentStatus === 'full_time') ? 'selected' : '' %>>Full-time Formal Education (Ineligible)</option>
-                            </select>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Formal Education Enrollment</label>
+                                <select name="enrollmentStatus" id="editEnrollmentStatus"
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none bg-white">
+                                    <option value="">Select Enrollment...</option>
+                                    <option value="not_enrolled" <%= (activeUser && activeUser.enrollmentStatus === 'not_enrolled') ? 'selected' : '' %>>Not Enrolled / Completed</option>
+                                    <option value="part_time_or_distance" <%= (activeUser && activeUser.enrollmentStatus === 'part_time_or_distance') ? 'selected' : '' %>>Part-time / Distance Learning</option>
+                                    <option value="full_time" <%= (activeUser && activeUser.enrollmentStatus === 'full_time') ? 'selected' : '' %>>Full-time Formal Education (Ineligible)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Employment Status</label>
+                                <select name="employmentStatus" id="editEmploymentStatus"
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none bg-white">
+                                    <option value="">Select Employment...</option>
+                                    <option value="unemployed" <%= (activeUser && activeUser.employmentStatus === 'unemployed') ? 'selected' : '' %>>Unemployed / Seeking Internship</option>
+                                    <option value="part_time_or_freelance" <%= (activeUser && activeUser.employmentStatus === 'part_time_or_freelance') ? 'selected' : '' %>>Part-time / Freelance</option>
+                                    <option value="full_time" <%= (activeUser && activeUser.employmentStatus === 'full_time') ? 'selected' : '' %>>Full-time Regular Employment (Ineligible)</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Employment Status</label>
-                            <select name="employmentStatus" id="editEmploymentStatus"
-                                class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none bg-white">
-                                <option value="">Select Employment...</option>
-                                <option value="unemployed" <%= (activeUser && activeUser.employmentStatus === 'unemployed') ? 'selected' : '' %>>Unemployed / Seeking Internship</option>
-                                <option value="part_time_or_freelance" <%= (activeUser && activeUser.employmentStatus === 'part_time_or_freelance') ? 'selected' : '' %>>Part-time / Freelance</option>
-                                <option value="full_time" <%= (activeUser && activeUser.employmentStatus === 'full_time') ? 'selected' : '' %>>Full-time Regular Employment (Ineligible)</option>
-                            </select>
+                            <div class="flex items-center justify-between gap-3 mb-1">
+                                <label class="block font-semibold text-slate-700">Skills and proficiency</label>
+                                <button type="button" id="addSkillProfileBtn"
+                                    class="text-indigo-700 hover:text-indigo-800 font-bold inline-flex items-center gap-1 cursor-pointer">
+                                    <i class="ph-bold ph-plus"></i> Add skill
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mb-2">Choose the level that best reflects your current ability.</p>
+                            <div id="skillProfileFields" class="space-y-2 max-h-48 overflow-y-auto invisible-scrollbar w-full" style="scrollbar-width: none; -ms-overflow-style: none;">
+                                <% const editableSkillEntries = profileSkillEntries.length ? profileSkillEntries : [{ name: '', proficiency: 'Intermediate' }]; %>
+                                <% editableSkillEntries.forEach(skill => { %>
+                                    <div data-skill-profile-row class="flex items-center gap-2 w-full">
+                                        <label class="sr-only">Skill name</label>
+                                        <input type="text" name="skillName" value="<%= skill.name %>" maxlength="80"
+                                            placeholder="e.g. JavaScript"
+                                            class="flex-1 min-w-0 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none text-xs">
+                                        <label class="sr-only">Proficiency</label>
+                                        <select name="skillProficiency" aria-label="Proficiency for <%= skill.name || 'skill' %>"
+                                            class="shrink-0 w-28 sm:w-32 px-2.5 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-600 outline-none text-xs cursor-pointer">
+                                            <% ['Beginner', 'Intermediate', 'Advanced'].forEach(level => { %>
+                                                <option value="<%= level %>" <%= skill.proficiency === level ? 'selected' : '' %>><%= level %></option>
+                                            <% }) %>
+                                        </select>
+                                        <button type="button" data-remove-skill-profile aria-label="Remove <%= skill.name || 'skill' %>"
+                                            class="shrink-0 p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer transition-colors">
+                                            <i class="ph-bold ph-trash text-base"></i>
+                                        </button>
+                                    </div>
+                                <% }) %>
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <div class="flex items-center justify-between gap-3 mb-1">
-                            <label class="block font-semibold text-slate-700">Skills and proficiency</label>
-                            <button type="button" id="addSkillProfileBtn"
-                                class="text-indigo-700 hover:text-indigo-800 font-bold inline-flex items-center gap-1">
-                                <i class="ph-bold ph-plus"></i> Add skill
-                            </button>
-                        </div>
-                        <p class="text-[11px] text-slate-500 mb-2">Choose the level that best reflects your current ability.</p>
-                        <div id="skillProfileFields" class="space-y-2">
-                            <% const editableSkillEntries = profileSkillEntries.length ? profileSkillEntries : [{ name: '', proficiency: 'Intermediate' }]; %>
-                            <% editableSkillEntries.forEach(skill => { %>
-                                <div data-skill-profile-row class="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 items-center">
-                                    <label class="sr-only">Skill name</label>
-                                    <input type="text" name="skillName" value="<%= skill.name %>" maxlength="80"
-                                        placeholder="e.g. JavaScript"
-                                        class="min-w-0 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none">
-                                    <label class="sr-only">Proficiency</label>
-                                    <select name="skillProficiency" aria-label="Proficiency for <%= skill.name || 'skill' %>"
-                                        class="px-2 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-600 outline-none">
-                                        <% ['Beginner', 'Intermediate', 'Advanced'].forEach(level => { %>
-                                            <option value="<%= level %>" <%= skill.proficiency === level ? 'selected' : '' %>><%= level %></option>
-                                        <% }) %>
-                                    </select>
-                                    <button type="button" data-remove-skill-profile aria-label="Remove <%= skill.name || 'skill' %>"
-                                        class="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50">
-                                        <i class="ph-bold ph-trash"></i>
-                                    </button>
-                                </div>
-                            <% }) %>
+
+                        <!-- Live PMIS Eligibility Status Preview Box in Modal -->
+                        <div id="liveEligibilityPreview"
+                            class="rounded-xl p-3 border border-slate-200 bg-slate-50 transition-all text-xs space-y-1.5">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                                    <i class="ph-bold ph-shield-check text-indigo-600"></i>
+                                    Live PMIS Status Preview
+                                </span>
+                                <span id="liveBadge" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] border"></span>
+                            </div>
+                            <p id="liveFeedback" class="text-[11px] leading-relaxed text-slate-600"></p>
                         </div>
                     </div>
 
-                    <!-- Live PMIS Eligibility Status Preview Box in Modal -->
-                    <div id="liveEligibilityPreview"
-                        class="rounded-xl p-3 border border-slate-200 bg-slate-50 transition-all text-xs space-y-1.5">
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="font-bold text-slate-700 flex items-center gap-1.5">
-                                <i class="ph-bold ph-shield-check text-indigo-600"></i>
-                                Live PMIS Status Preview
-                            </span>
-                            <span id="liveBadge" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] border"></span>
-                        </div>
-                        <p id="liveFeedback" class="text-[11px] leading-relaxed text-slate-600"></p>
-                    </div>
-
-                    <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                         <button type="button" id="cancelModalBtn"
-                            class="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
+                            class="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-200/70 rounded-lg border border-slate-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
                         <button type="submit" id="saveProfileBtn"
                             class="px-4 py-2 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">Save
                             Profile</button>
@@ -1189,7 +1205,7 @@
                     if (!skillProfileFields) return;
                     const row = document.createElement('div');
                     row.dataset.skillProfileRow = '';
-                    row.className = 'grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 items-center';
+                    row.className = 'flex items-center gap-2 w-full';
 
                     const nameInput = document.createElement('input');
                     nameInput.type = 'text';
@@ -1197,12 +1213,12 @@
                     nameInput.maxLength = 80;
                     nameInput.placeholder = 'e.g. JavaScript';
                     nameInput.setAttribute('aria-label', 'Skill name');
-                    nameInput.className = 'min-w-0 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none';
+                    nameInput.className = 'flex-1 min-w-0 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none text-xs';
 
                     const proficiencySelect = document.createElement('select');
                     proficiencySelect.name = 'skillProficiency';
                     proficiencySelect.setAttribute('aria-label', 'Proficiency for new skill');
-                    proficiencySelect.className = 'px-2 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-600 outline-none';
+                    proficiencySelect.className = 'shrink-0 w-28 sm:w-32 px-2.5 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-600 outline-none text-xs cursor-pointer';
                     ['Beginner', 'Intermediate', 'Advanced'].forEach(level => {
                         const option = new Option(level, level, level === 'Intermediate', level === 'Intermediate');
                         proficiencySelect.add(option);
@@ -1212,12 +1228,13 @@
                     removeButton.type = 'button';
                     removeButton.dataset.removeSkillProfile = '';
                     removeButton.setAttribute('aria-label', 'Remove skill');
-                    removeButton.className = 'p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50';
-                    removeButton.innerHTML = '<i class="ph-bold ph-trash"></i>';
+                    removeButton.className = 'shrink-0 p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer transition-colors';
+                    removeButton.innerHTML = '<i class="ph-bold ph-trash text-base"></i>';
 
                     row.append(nameInput, proficiencySelect, removeButton);
                     skillProfileFields.append(row);
                     nameInput.focus();
+                    row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 };
 
                 if (addSkillProfileBtn) addSkillProfileBtn.addEventListener('click', addSkillProfileRow);
