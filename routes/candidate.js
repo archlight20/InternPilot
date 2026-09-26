@@ -454,9 +454,54 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
     try {
         const userId = req.user._id || req.user.id;
         const candidate = await User.findById(userId);
-        const applications = await Application.find({ candidate: userId })
+        const searchQuery = (req.query.search || '').trim();
+        const statusFilter = (req.query.status || 'all').trim();
+        const sortOrder = (req.query.sort || 'applied_desc').trim();
+
+        const allApplications = await Application.find({ candidate: userId });
+        const stats = {
+            total: allApplications.length,
+            submitted: allApplications.filter(a => a.status === 'Submitted').length,
+            underReview: allApplications.filter(a => a.status === 'Under Review').length,
+            shortlisted: allApplications.filter(a => a.status === 'Shortlisted').length,
+            rejected: allApplications.filter(a => a.status === 'Rejected').length
+        };
+
+        let query = { candidate: userId };
+
+        if (statusFilter !== 'all') {
+            if (statusFilter.toLowerCase() === 'submitted') {
+                query.status = { $in: ['Submitted', 'pending'] };
+            } else {
+                query.status = new RegExp('^' + statusFilter.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&') + '$', 'i');
+            }
+        }
+
+        if (searchQuery) {
+            const Internship = require('../models/Internship');
+            const escapeRegex = (text) => text.replace(/[-[\]{}()*+?.,\\\\^$|#\\s]/g, '\\\\$&');
+            const regex = new RegExp(escapeRegex(searchQuery), 'gi');
+            
+            const matchingInternships = await Internship.find({
+                $or: [{ title: regex }, { companyName: regex }, { company: regex }]
+            }).select('_id');
+            
+            const internshipIds = matchingInternships.map(i => i._id);
+            query.internship = { $in: internshipIds };
+        }
+
+        let sortObj = { appliedAt: -1, _id: -1 };
+        if (sortOrder === 'applied_asc') {
+            sortObj = { appliedAt: 1, _id: 1 };
+        } else if (sortOrder === 'updated_desc') {
+            sortObj = { statusUpdatedAt: -1, _id: -1 };
+        } else if (sortOrder === 'match_desc') {
+            sortObj = { matchScore: -1, _id: -1 };
+        }
+
+        const applications = await Application.find(query)
             .populate('internship')
-            .sort({ statusUpdatedAt: -1, appliedAt: -1 });
+            .sort(sortObj);
 
         const stats = {
             total: applications.length,
@@ -473,6 +518,9 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
             stats,
             searchQuery: '',
             statusFilter: 'all',
+            searchQuery,
+            statusFilter,
+            sortOrder,
             pageTitle: 'My Applications',
             formatRelativeTime,
             formatLocalizedDateTime

@@ -66,6 +66,7 @@
                     <i class="ph-bold ph-file-x text-sm"></i> No Resume Uploaded
                 </span>
             <% } %>
+            <% if (typeof messageUnreadCount !== 'undefined') { %><%- include('../partials/message-start-button', { application, label: 'Message candidate' }) %><% } %>
         </div>
     </div>
 

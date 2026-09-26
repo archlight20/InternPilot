@@ -1,0 +1,17 @@
+<%
+    // Opens the conversation for one application, creating it the first time.
+    // The server checks the viewer is the candidate or on the hiring team.
+    const startApplication = typeof application !== 'undefined' && application ? application : null;
+    const startLabel = typeof label !== 'undefined' && label ? label : 'Message';
+    // Compact is icon-only (label kept as tooltip) for tight rows like the applicant cards.
+    const startCompact = typeof compact !== 'undefined' && Boolean(compact);
+%>
+<% if (startApplication && startApplication._id) { %>
+    <form action="/messages/start/<%= startApplication._id %>" method="POST" class="inline-flex">
+        <button type="submit"<% if (startCompact) { %> title="<%= startLabel %>" aria-label="<%= startLabel %>"<% } %>
+            class="inline-flex items-center gap-1.5 <%= startCompact ? 'px-2.5 py-1.5 shadow-sm' : 'px-3 py-2' %> bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors cursor-pointer">
+            <i class="ph-bold ph-chat-circle-text <%= startCompact ? 'text-base' : 'text-sm' %>" aria-hidden="true"></i>
+            <% if (!startCompact) { %><%= startLabel %><% } %>
+        </button>
+    </form>
+<% } %>

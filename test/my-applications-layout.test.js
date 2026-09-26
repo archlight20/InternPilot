@@ -118,7 +118,7 @@ test('the legacy My Applications URL renders the canonical tracker template', ()
     );
 
     assert.match(candidateRoutes, /res\.render\('candidate\/candidate-tracker'/);
-    assert.match(candidateRoutes, /sort\(\{ statusUpdatedAt: -1, appliedAt: -1 \}\)/);
+    assert.match(candidateRoutes, /\.sort\(sortObj\)/);
 });
 
 test('invalid legacy date values do not break the application page', () => {

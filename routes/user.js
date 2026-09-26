@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 const router = express.Router();
 const multer = require('multer');
@@ -24,7 +26,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -36,10 +38,14 @@ const upload = multer({
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         ];
-        if (allowedMimes.includes(file.mimetype)) {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const allowedExts = ['.pdf', '.doc', '.docx'];
+        if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
             cb(null, true);
         } else {
-            cb(new Error('Only PDF and Word (.docx) files are allowed.'));
+            const err = new Error('Invalid file type. Only PDF (.pdf) and Word (.docx, .doc) files are allowed.');
+            err.code = 'INVALID_FILE_TYPE';
+            cb(err);
         }
     }
 });
@@ -68,7 +74,46 @@ function escapeRegExp(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-async function analyzeResumeQuality(text) {
+async function analyzeResumeQuality(text, customClient = null) {
+    if (!text || !text.trim()) {
+        console.warn('Resume text is empty; skipping AI quality feedback generation.');
+        return {
+            quantifiableAchievements: {
+                status: 'needs_improvement',
+                feedback: 'Resume text could not be extracted.'
+            },
+            technicalSkills: {
+                status: 'needs_improvement',
+                feedback: 'Resume text could not be extracted.'
+            },
+            projects: {
+                status: 'needs_improvement',
+                feedback: 'Resume text could not be extracted.'
+            },
+            overallFeedback: 'Resume uploaded successfully, but text could not be read for AI feedback.'
+        };
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey && !customClient) {
+        console.warn('GEMINI_API_KEY is not configured in environment variables.');
+        return {
+            quantifiableAchievements: {
+                status: 'needs_improvement',
+                feedback: 'Resume quality analysis was unavailable.'
+            },
+            technicalSkills: {
+                status: 'needs_improvement',
+                feedback: 'Resume quality analysis was unavailable.'
+            },
+            projects: {
+                status: 'needs_improvement',
+                feedback: 'Resume quality analysis was unavailable.'
+            },
+            overallFeedback: 'Resume uploaded successfully, but AI quality feedback could not be generated.'
+        };
+    }
+
     try {
         const prompt = `
 Analyze this resume for quality improvement.
@@ -83,35 +128,81 @@ Give actionable feedback, not a numeric score.
 Return ONLY valid JSON in this format:
 {
   "quantifiableAchievements": {
-    "status": "good" or "needs_improvement",
+    "status": "good",
     "feedback": "..."
   },
   "technicalSkills": {
-    "status": "good" or "needs_improvement",
+    "status": "needs_improvement",
     "feedback": "..."
   },
   "projects": {
-    "status": "good" or "needs_improvement",
+    "status": "good",
     "feedback": "..."
   },
   "overallFeedback": "..."
 }
 
+Note: The "status" property must be either "good" or "needs_improvement".
+
 Resume text:
 ${text}
 `;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }]
-        });
+        const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+        const client = customClient || ai || new GoogleGenAI({ apiKey });
 
-        const rawText = response.text || '{}';
-        const cleanedText = rawText.replace(/```json|```/g, '').trim();
+        let response;
+        try {
+            response = await client.models.generateContent({
+                model: modelName,
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                config: {
+                    responseMimeType: 'application/json'
+                }
+            });
+        } catch (callErr) {
+            const isTransientError = callErr.status === 503 || (callErr.message && /high demand|temporar|503/i.test(callErr.message));
+            if (isTransientError && modelName !== 'gemini-3.5-flash') {
+                console.warn(`Model ${modelName} is experiencing high demand. Failing over to gemini-3.5-flash...`);
+                response = await client.models.generateContent({
+                    model: 'gemini-3.5-flash',
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    config: {
+                        responseMimeType: 'application/json'
+                    }
+                });
+            } else {
+                throw callErr;
+            }
+        }
 
-        return JSON.parse(cleanedText);
+        const rawText = (response && response.text) ? response.text : '{}';
+        let cleanedText = rawText.replace(/```(?:json)?\n?([\s\S]*?)```/g, '$1').replace(/```json|```/g, '').trim();
+        const firstBrace = cleanedText.indexOf('{');
+        const lastBrace = cleanedText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleanedText = cleanedText.substring(firstBrace, lastBrace + 1);
+        }
+
+        const parsed = JSON.parse(cleanedText);
+
+        return {
+            quantifiableAchievements: {
+                status: parsed && parsed.quantifiableAchievements && parsed.quantifiableAchievements.status ? parsed.quantifiableAchievements.status : 'needs_improvement',
+                feedback: parsed && parsed.quantifiableAchievements && parsed.quantifiableAchievements.feedback ? parsed.quantifiableAchievements.feedback : 'Resume quality analysis was unavailable.'
+            },
+            technicalSkills: {
+                status: parsed && parsed.technicalSkills && parsed.technicalSkills.status ? parsed.technicalSkills.status : 'needs_improvement',
+                feedback: parsed && parsed.technicalSkills && parsed.technicalSkills.feedback ? parsed.technicalSkills.feedback : 'Resume quality analysis was unavailable.'
+            },
+            projects: {
+                status: parsed && parsed.projects && parsed.projects.status ? parsed.projects.status : 'needs_improvement',
+                feedback: parsed && parsed.projects && parsed.projects.feedback ? parsed.projects.feedback : 'Resume quality analysis was unavailable.'
+            },
+            overallFeedback: parsed && parsed.overallFeedback ? parsed.overallFeedback : 'Resume uploaded successfully.'
+        };
     } catch (error) {
-        console.error('Error analyzing resume quality:', error);
+        console.error('Error analyzing resume quality with Gemini AI:', error.message || error);
 
         return {
             quantifiableAchievements: {
@@ -210,7 +301,13 @@ router.post('/candidate/profile/edit', isAuthenticated, authorize('candidate'), 
 router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), (req, res, next) => {
     upload.single('resume')(req, res, (err) => {
         if (err) {
-            if (req.flash) req.flash('error_msg', err.message || 'File upload failed. Only PDF and Word files under 5MB are accepted.');
+            let errorMsg = 'File upload failed.';
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                errorMsg = 'Resume file is too large. Maximum allowed size is 5MB.';
+            } else if (err.code === 'INVALID_FILE_TYPE' || err.message) {
+                errorMsg = err.message;
+            }
+            if (req.flash) req.flash('error_msg', errorMsg);
             return res.redirect('/candidate/profile');
         }
         next();
@@ -218,7 +315,7 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
 }, async (req, res) => {
     try {
         if (!req.file) {
-            if (req.flash) req.flash('error_msg', 'Please upload a valid PDF or Word resume.');
+            if (req.flash) req.flash('error_msg', 'Please select a valid PDF or Word resume to upload.');
             return res.redirect('/candidate/profile');
         }
 
@@ -230,25 +327,51 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
                 const uploadStream = cloudinary.uploader.upload_stream(
                     {
                         public_id: publicId,
-                        resource_type: 'raw'
+                        resource_type: 'raw',
+                        disable_promises: true
                     },
                     (error, result) => {
                         if (error) reject(error);
                         else resolve(result);
                     }
                 );
+                uploadStream.on('error', (error) => reject(error));
                 uploadStream.end(file.buffer);
             });
         };
 
-        const cloudinaryResult = await uploadToCloudinary(req.file);
-        const resumeUrl = cloudinaryResult.secure_url;
+        const resumeOriginalName = req.file.originalname;
+        const resumeUploadedAt = new Date();
+        let resumeUrl = '';
+
+        try {
+            const cloudinaryResult = await uploadToCloudinary(req.file);
+            resumeUrl = cloudinaryResult.secure_url;
+        } catch (cloudErr) {
+            console.warn('Cloudinary upload failed, falling back to local file storage:', cloudErr.message || cloudErr);
+            const safeName = req.file.originalname.replace(/[^a-zA-Z0-9_.-]/g, '_');
+            const uniqueFileName = `${Date.now()}_${safeName}`;
+            const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'resumes');
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            const localFilePath = path.join(uploadDir, uniqueFileName);
+            fs.writeFileSync(localFilePath, req.file.buffer);
+            resumeUrl = `/uploads/resumes/${uniqueFileName}`;
+        }
 
         let text = '';
-        if (req.file.mimetype === 'application/pdf' || req.file.mimetype === 'application/x-pdf') {
-            text = await extractPdfText(req.file.buffer);
-        } else {
-            text = await extractDocxText(req.file.buffer);
+        try {
+            const isPdf = req.file.mimetype === 'application/pdf' ||
+                          req.file.mimetype === 'application/x-pdf' ||
+                          (req.file.originalname || '').toLowerCase().endsWith('.pdf');
+            if (isPdf) {
+                text = await extractPdfText(req.file.buffer);
+            } else {
+                text = await extractDocxText(req.file.buffer);
+            }
+        } catch (extractError) {
+            console.warn('Text extraction warning:', extractError.message);
         }
 
         const skillBank = [
@@ -296,6 +419,7 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
                 conflicts,
                 autoMerged,
                 resumeUrl,
+                resumeOriginalName,
                 resumeQuality,
                 showConflictModal: true
             });
@@ -305,6 +429,8 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
         const updateDoc = {
             $set: {
                 resume: resumeUrl,
+                resumeOriginalName,
+                resumeUploadedAt,
                 resumeQuality
             }
         };
@@ -325,12 +451,22 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
         }
 
         await User.findByIdAndUpdate(userId, updateDoc);
-        if (req.flash) req.flash('success_msg', 'Resume uploaded and profile updated automatically!');
+        await Recommendation.deleteMany({ candidate: userId });
+        if (req.flash) req.flash('success_msg', 'Resume uploaded successfully! Your profile details have been synced.');
 
         res.redirect('/candidate/profile');
     } catch (error) {
         console.error('Error uploading/parsing resume:', error);
-        if (req.flash) req.flash('error_msg', `Failed to process resume upload: ${error.message}`);
+        let errorMsg = 'Failed to process resume upload. Please try again.';
+        const msg = error.message || '';
+        if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || /timeout|network|connect|econn/i.test(msg)) {
+            errorMsg = 'Network error while uploading resume. Please check your internet connection and try again.';
+        } else if (/cloudinary/i.test(msg) || error.http_code) {
+            errorMsg = 'Cloud storage service error while saving resume. Please try again later.';
+        } else if (msg) {
+            errorMsg = `Resume upload failed: ${msg}`;
+        }
+        if (req.flash) req.flash('error_msg', errorMsg);
         res.redirect('/candidate/profile');
     }
 });
@@ -360,12 +496,17 @@ router.post('/candidate/profile/confirm-update', isAuthenticated, authorize('can
         } catch (_) { /* ignore */ }
 
         const resumeUrl = req.body.resumeUrl || '';
+        const resumeOriginalName = req.body.resumeOriginalName || '';
 
         // ── Build the final update document ───────────────────────
         const updateDoc = { $set: {} };
 
         // Always save the resume URL and quality analysis
-        if (resumeUrl) updateDoc.$set.resume = resumeUrl;
+        if (resumeUrl) {
+            updateDoc.$set.resume = resumeUrl;
+            if (resumeOriginalName) updateDoc.$set.resumeOriginalName = resumeOriginalName;
+            updateDoc.$set.resumeUploadedAt = new Date();
+        }
         if (resumeQuality) updateDoc.$set.resumeQuality = resumeQuality;
 
         // Apply auto-merged fields
@@ -422,11 +563,32 @@ router.post('/candidate/profile/confirm-update', isAuthenticated, authorize('can
 
         await User.findByIdAndUpdate(userId, updateDoc, { runValidators: false });
         await Recommendation.deleteMany({ candidate: userId });
-        if (req.flash) req.flash('success_msg', 'Profile updated with your selected changes!');
+        if (req.flash) req.flash('success_msg', 'Resume uploaded successfully! Your profile has been updated with your selected choices.');
         res.redirect('/candidate/profile');
     } catch (error) {
         console.error('Error confirming profile update:', error);
         if (req.flash) req.flash('error_msg', 'Failed to save profile changes. Please try again.');
+        res.redirect('/candidate/profile');
+    }
+});
+
+// ── Delete on-file resume ─────────────────────────────────────────────
+router.post('/candidate/resume/delete', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        await User.findByIdAndUpdate(userId, {
+            $set: {
+                resume: '',
+                resumeOriginalName: '',
+                resumeUploadedAt: null,
+                resumeQuality: null
+            }
+        });
+        if (req.flash) req.flash('success_msg', 'Resume removed successfully from your profile.');
+        res.redirect('/candidate/profile');
+    } catch (error) {
+        console.error('Error removing resume:', error);
+        if (req.flash) req.flash('error_msg', 'Failed to remove resume. Please try again.');
         res.redirect('/candidate/profile');
     }
 });
@@ -485,8 +647,21 @@ function parseTechStack(value) {
 
 async function storeDocument(file, folder) {
     if (!file) return null;
-    const result = await uploadBufferToCloudinary(file, folder);
-    return { fileUrl: result.secure_url, fileName: file.originalname };
+    try {
+        const result = await uploadBufferToCloudinary(file, folder);
+        return { fileUrl: result.secure_url, fileName: file.originalname };
+    } catch (cloudErr) {
+        console.warn('Cloudinary upload failed in storeDocument, falling back to local file storage:', cloudErr.message || cloudErr);
+        const safeName = (file.originalname || 'document').replace(/[^a-zA-Z0-9_.-]/g, '_');
+        const uniqueFileName = `${Date.now()}_${safeName}`;
+        const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'documents');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const localFilePath = path.join(uploadDir, uniqueFileName);
+        fs.writeFileSync(localFilePath, file.buffer);
+        return { fileUrl: `/uploads/documents/${uniqueFileName}`, fileName: file.originalname };
+    }
 }
 
 function redirectWithError(req, res, message) {
@@ -674,20 +849,54 @@ router.get('/candidate/applications', isAuthenticated, authorize('candidate'), a
     try {
         const userId = req.user._id || req.user.id;
         const candidate = await User.findById(userId);
-        const applications = await Application.find({ candidate: userId })
-            .populate('internship')
-            .sort({ appliedAt: -1, _id: -1 });
-
-        const stats = {
-            total: applications.length,
-            submitted: applications.filter(a => a.status === 'Submitted').length,
-            underReview: applications.filter(a => a.status === 'Under Review').length,
-            shortlisted: applications.filter(a => a.status === 'Shortlisted').length,
-            rejected: applications.filter(a => a.status === 'Rejected').length
-        };
-
         const searchQuery = (req.query.search || '').trim();
         const statusFilter = (req.query.status || 'all').trim();
+        const sortOrder = (req.query.sort || 'applied_desc').trim();
+
+        const allApplications = await Application.find({ candidate: userId });
+        const stats = {
+            total: allApplications.length,
+            submitted: allApplications.filter(a => a.status === 'Submitted').length,
+            underReview: allApplications.filter(a => a.status === 'Under Review').length,
+            shortlisted: allApplications.filter(a => a.status === 'Shortlisted').length,
+            rejected: allApplications.filter(a => a.status === 'Rejected').length
+        };
+
+        let query = { candidate: userId };
+
+        if (statusFilter !== 'all') {
+            if (statusFilter.toLowerCase() === 'submitted') {
+                query.status = { $in: ['Submitted', 'pending'] };
+            } else {
+                query.status = new RegExp('^' + statusFilter.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&') + '$', 'i');
+            }
+        }
+
+        if (searchQuery) {
+            const Internship = require('../models/Internship');
+            const escapeRegex = (text) => text.replace(/[-[\]{}()*+?.,\\\\^$|#\\s]/g, '\\\\$&');
+            const regex = new RegExp(escapeRegex(searchQuery), 'gi');
+            
+            const matchingInternships = await Internship.find({
+                $or: [{ title: regex }, { companyName: regex }, { company: regex }]
+            }).select('_id');
+            
+            const internshipIds = matchingInternships.map(i => i._id);
+            query.internship = { $in: internshipIds };
+        }
+
+        let sortObj = { appliedAt: -1, _id: -1 };
+        if (sortOrder === 'applied_asc') {
+            sortObj = { appliedAt: 1, _id: 1 };
+        } else if (sortOrder === 'updated_desc') {
+            sortObj = { statusUpdatedAt: -1, _id: -1 };
+        } else if (sortOrder === 'match_desc') {
+            sortObj = { matchScore: -1, _id: -1 };
+        }
+
+        const applications = await Application.find(query)
+            .populate('internship')
+            .sort(sortObj);
 
         res.render('candidate/candidate-tracker', {
             candidate,
@@ -695,6 +904,7 @@ router.get('/candidate/applications', isAuthenticated, authorize('candidate'), a
             stats,
             searchQuery,
             statusFilter,
+            sortOrder,
             formatRelativeTime,
             formatLocalizedDateTime
         });
@@ -806,5 +1016,7 @@ router.get('/recommendations/:userId', isAuthenticated, authorize('candidate'), 
         res.status(500).send('Internal Server Error');
     }
 });
+
+router.analyzeResumeQuality = analyzeResumeQuality;
 
 module.exports = router;

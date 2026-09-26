@@ -82,7 +82,7 @@ ${JSON.stringify(internshipsPayload, null, 2)}
 `;
             
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 config: {
                     responseMimeType: "application/json",

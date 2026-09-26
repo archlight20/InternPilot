@@ -1,0 +1,174 @@
+<% layout('layouts/boilerplate') %>
+<%
+    const other = side === 'candidate'
+        ? ((conversation.company && (conversation.company.companyDetails?.companyName || conversation.company.name)) ||
+            (conversation.internship && conversation.internship.companyName) || 'Company')
+        : ((conversation.candidate && conversation.candidate.name) || 'Candidate');
+    const status = (conversation.application && conversation.application.status) || 'Submitted';
+    const lastAt = messages.length ? messages[messages.length - 1].createdAt : '';
+    const fmt = value => new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+%>
+
+<div class="max-w-3xl mx-auto space-y-4">
+    <div class="flex items-center gap-3">
+        <a href="/messages" class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline">
+            <i class="ph-bold ph-arrow-left" aria-hidden="true"></i> All messages
+        </a>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col" style="height: min(72vh, 720px)">
+        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
+            <div class="min-w-0">
+                <h1 class="text-base font-bold text-slate-900 truncate"><%= other %></h1>
+                <p class="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+                    <i class="ph-bold ph-briefcase" aria-hidden="true"></i>
+                    <%= (conversation.internship && conversation.internship.title) || 'Internship' %>
+                </p>
+            </div>
+            <span class="shrink-0 text-[11px] font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                <%= status %>
+            </span>
+        </div>
+
+        <ol id="messageList" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50/60" aria-live="polite"
+            data-updates-url="/messages/<%= conversation._id %>/updates" data-last-at="<%= lastAt ? new Date(lastAt).toISOString() : '' %>">
+            <% if (!messages.length) { %>
+                <li id="emptyThread" class="text-center text-xs text-slate-400 py-10">No messages yet. Say hello.</li>
+            <% } %>
+            <% messages.forEach(m => { %>
+                <li class="flex <%= m.mine ? 'justify-end' : 'justify-start' %>" data-message-id="<%= m.id %>">
+                    <div class="max-w-[80%]">
+                        <div class="px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words <%= m.mine ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-md' %>"><%= m.body %></div>
+                        <p class="text-[10px] text-slate-400 mt-1 <%= m.mine ? 'text-right' : '' %>">
+                            <%= m.mine ? 'You' : (m.senderName || other) %> · <%= fmt(m.createdAt) %>
+                        </p>
+                    </div>
+                </li>
+            <% }) %>
+        </ol>
+
+        <% if (readOnly) { %>
+            <div class="px-4 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-500 flex items-center gap-2 rounded-b-xl">
+                <i class="ph-bold ph-lock-simple" aria-hidden="true"></i>
+                This application is <%= status.toLowerCase() %>, so the conversation is read-only.
+            </div>
+        <% } else { %>
+            <form id="messageForm" action="/messages/<%= conversation._id %>" method="POST" data-no-loading
+                class="border-t border-slate-100 p-3 flex items-end gap-2">
+                <label for="messageBody" class="sr-only">Message</label>
+                <div class="flex-1">
+                    <textarea id="messageBody" name="body" rows="2" maxlength="<%= maxLength %>" required
+                        placeholder="Write a message..."
+                        class="w-full resize-none px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"></textarea>
+                    <div class="flex items-center justify-between mt-1 text-[10px] text-slate-400">
+                        <span id="messageError" class="text-rose-600 font-semibold" role="alert"></span>
+                        <span><span id="charCount">0</span>/<%= maxLength %> · Ctrl+Enter to send</span>
+                    </div>
+                </div>
+                <button type="submit" id="sendButton"
+                    class="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50">
+                    <i class="ph-bold ph-paper-plane-right" aria-hidden="true"></i> Send
+                </button>
+            </form>
+        <% } %>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const list = document.getElementById('messageList');
+        if (!list || !window.fetch) return;
+
+        // "<" is escaped so a name holding a closing script tag can't end this block early.
+        const OTHER = <%- JSON.stringify(other).replace(/</g, '\\u003c') %>;
+        const POLL_MS = 5000;
+        let lastAt = list.dataset.lastAt || '';
+        const seen = new Set(Array.from(list.querySelectorAll('[data-message-id]')).map(li => li.dataset.messageId));
+
+        const scrollToEnd = () => { list.scrollTop = list.scrollHeight; };
+        scrollToEnd();
+
+        const fmt = value => new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+
+        // Built with textContent, never innerHTML, so message text can't inject markup.
+        const append = (m) => {
+            if (seen.has(m.id)) return;
+            seen.add(m.id);
+            const empty = document.getElementById('emptyThread');
+            if (empty) empty.remove();
+
+            const li = document.createElement('li');
+            li.className = 'flex ' + (m.mine ? 'justify-end' : 'justify-start');
+            li.dataset.messageId = m.id;
+            const wrap = document.createElement('div');
+            wrap.className = 'max-w-[80%]';
+            const bubble = document.createElement('div');
+            bubble.className = 'px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words ' +
+                (m.mine ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-md');
+            bubble.textContent = m.body;
+            const meta = document.createElement('p');
+            meta.className = 'text-[10px] text-slate-400 mt-1' + (m.mine ? ' text-right' : '');
+            meta.textContent = (m.mine ? 'You' : (m.senderName || OTHER)) + ' · ' + fmt(m.createdAt);
+            wrap.append(bubble, meta);
+            li.appendChild(wrap);
+            list.appendChild(li);
+            if (!lastAt || new Date(m.createdAt) > new Date(lastAt)) lastAt = m.createdAt;
+        };
+
+        const poll = async () => {
+            if (document.visibilityState !== 'visible') return;
+            try {
+                const url = list.dataset.updatesUrl + (lastAt ? '?after=' + encodeURIComponent(lastAt) : '');
+                const res = await fetch(url, { headers: { Accept: 'application/json', 'X-Requested-With': 'fetch' }, credentials: 'same-origin' });
+                if (!res.ok || !(res.headers.get('content-type') || '').includes('application/json')) return;
+                const data = await res.json();
+                const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+                (data.messages || []).forEach(append);
+                if (data.messages && data.messages.length && nearBottom) scrollToEnd();
+                // The application closed while the thread was open.
+                if (data.readOnly && document.getElementById('messageForm')) window.location.reload();
+            } catch (err) { /* keep the page usable if a poll fails */ }
+        };
+        setInterval(poll, POLL_MS);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poll(); });
+
+        const form = document.getElementById('messageForm');
+        if (!form) return;
+        const box = document.getElementById('messageBody');
+        const button = document.getElementById('sendButton');
+        const error = document.getElementById('messageError');
+        const counter = document.getElementById('charCount');
+
+        box.addEventListener('input', () => { counter.textContent = box.value.length; error.textContent = ''; });
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = box.value.trim();
+            if (!body) { error.textContent = 'Write a message before sending.'; return; }
+            button.disabled = true;
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'fetch' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ body })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { error.textContent = data.error || 'Could not send. Please try again.'; return; }
+                append(data.message);
+                scrollToEnd();
+                box.value = '';
+                counter.textContent = '0';
+            } catch (err) {
+                // Network trouble: fall back to a normal form post.
+                form.submit();
+            } finally {
+                button.disabled = false;
+                box.focus();
+            }
+        });
+    })();
+</script>

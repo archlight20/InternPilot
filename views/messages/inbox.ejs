@@ -1,0 +1,112 @@
+<% layout('layouts/boilerplate') %>
+<%
+    const timeAgo = value => {
+        if (!value) return '';
+        const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+        if (seconds < 60) return 'just now';
+        if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+        if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+        if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
+        return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    };
+    const isClosed = status => ['withdrawn', 'rejected'].includes(String(status || '').toLowerCase());
+    const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+    const startList = typeof startable !== 'undefined' && Array.isArray(startable) ? startable : [];
+%>
+
+<div class="max-w-3xl mx-auto space-y-5">
+    <div class="flex items-end justify-between gap-3 border-b border-slate-200 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Messages</h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                <%= viewerSide === 'candidate' ? 'Conversations with companies about your applications.' : 'Conversations with candidates about your listings.' %>
+            </p>
+        </div>
+        <% if (totalUnread > 0) { %>
+            <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full">
+                <%= totalUnread %> unread
+            </span>
+        <% } %>
+    </div>
+
+    <% if (!canMessage) { %>
+        <div class="bg-white border border-slate-200 rounded-xl p-10 text-center shadow-sm">
+            <i class="ph-bold ph-chat-circle-slash text-4xl text-slate-300 mb-2" aria-hidden="true"></i>
+            <p class="text-sm font-semibold text-slate-700">Messaging is for candidates and hiring teams.</p>
+        </div>
+    <% } else if (!conversations.length) { %>
+        <div class="bg-white border border-slate-200 rounded-xl p-10 text-center shadow-sm">
+            <i class="ph-bold ph-chat-circle-text text-4xl text-slate-300 mb-2" aria-hidden="true"></i>
+            <h2 class="text-base font-bold text-slate-800">No conversations yet</h2>
+            <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                <% if (viewerSide === 'candidate') { %>
+                    Recruiters can message you about your applications<%= startList.length ? ', or you can start a conversation below' : '' %>.
+                <% } else { %>
+                    Use the chat button on an applicant card, or "Message candidate" on their profile.
+                <% } %>
+            </p>
+        </div>
+    <% } else { %>
+        <ul class="bg-white border border-slate-200 rounded-xl shadow-sm divide-y divide-slate-100 overflow-hidden">
+            <% conversations.forEach(c => { %>
+                <%
+                    const other = viewerSide === 'candidate'
+                        ? ((c.company && (c.company.companyDetails?.companyName || c.company.name)) || (c.internship && c.internship.companyName) || 'Company')
+                        : ((c.candidate && c.candidate.name) || 'Candidate');
+                    const initial = String(other).trim().charAt(0).toUpperCase() || '?';
+                    const unread = c.unread || 0;
+                    const closed = isClosed(c.application && c.application.status);
+                %>
+                <li>
+                    <a href="/messages/<%= c._id %>" class="flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors <%= unread ? 'bg-indigo-50/40' : '' %>">
+                        <span class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold <%= viewerSide === 'candidate' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700' %>">
+                            <%= initial %>
+                        </span>
+                        <span class="flex-1 min-w-0">
+                            <span class="flex items-center justify-between gap-2">
+                                <span class="truncate text-sm <%= unread ? 'font-bold text-slate-900' : 'font-semibold text-slate-800' %>"><%= other %></span>
+                                <span class="shrink-0 text-[11px] text-slate-400"><%= timeAgo(c.lastMessageAt || c.updatedAt) %></span>
+                            </span>
+                            <span class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                                <i class="ph-bold ph-briefcase" aria-hidden="true"></i>
+                                <span class="truncate"><%= (c.internship && c.internship.title) || 'Internship' %></span>
+                                <% if (closed) { %>
+                                    <span class="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold">Closed</span>
+                                <% } %>
+                            </span>
+                            <span class="flex items-center justify-between gap-2 mt-1">
+                                <span class="truncate text-xs <%= unread ? 'text-slate-800 font-medium' : 'text-slate-500' %>">
+                                    <%= c.lastMessagePreview || 'No messages yet' %>
+                                </span>
+                                <% if (unread) { %>
+                                    <span class="shrink-0 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold tabular-nums"
+                                        aria-label="<%= unread %> unread"><%= unread > 99 ? '99+' : unread %></span>
+                                <% } %>
+                            </span>
+                        </span>
+                    </a>
+                </li>
+            <% }) %>
+        </ul>
+    <% } %>
+
+    <% if (canMessage && startList.length) { %>
+        <section class="space-y-2" aria-labelledby="startConversationHeading">
+            <div>
+                <h2 id="startConversationHeading" class="text-sm font-bold text-slate-800">Message a recruiter</h2>
+                <p class="text-xs text-slate-500">Open applications you haven't started a conversation about yet.</p>
+            </div>
+            <ul class="bg-white border border-slate-200 rounded-xl shadow-sm divide-y divide-slate-100 overflow-hidden">
+                <% startList.forEach(a => { %>
+                    <li class="flex items-center justify-between gap-3 px-4 py-3">
+                        <span class="min-w-0">
+                            <span class="block truncate text-sm font-semibold text-slate-800"><%= a.internship.title || 'Internship' %></span>
+                            <span class="block truncate text-[11px] text-slate-500"><%= a.internship.companyName || 'Company' %> · <%= a.status %></span>
+                        </span>
+                        <%- include('../partials/message-start-button', { application: a, label: 'Message recruiter' }) %>
+                    </li>
+                <% }) %>
+            </ul>
+        </section>
+    <% } %>
+</div>

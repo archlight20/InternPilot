@@ -86,13 +86,15 @@ const uploadBufferToCloudinary = (file, folder) => {
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 public_id: `${folder}/${Date.now()}_${safeName}`,
-                resource_type: isImage ? 'image' : 'raw'
+                resource_type: isImage ? 'image' : 'raw',
+                disable_promises: true
             },
             (error, result) => {
                 if (error) reject(error);
                 else resolve(result);
             }
         );
+        uploadStream.on('error', (error) => reject(error));
         uploadStream.end(file.buffer);
     });
 };

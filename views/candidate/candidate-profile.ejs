@@ -8,6 +8,23 @@
             ? activeUser.skills.map(name => ({ name, proficiency: 'Intermediate' }))
             : []); %>
 
+    <% 
+    let resumeDisplayName = '';
+    if (activeUser && activeUser.resumeOriginalName) {
+        resumeDisplayName = activeUser.resumeOriginalName;
+    } else if (activeUser && (activeUser.resume || activeUser.resumeUrl)) {
+        const rUrl = activeUser.resume || activeUser.resumeUrl;
+        try {
+            const parts = rUrl.split('/');
+            const lastPart = parts[parts.length - 1].split('?')[0];
+            resumeDisplayName = decodeURIComponent(lastPart.replace(/^\d+_/, '')) || 'resume.pdf';
+        } catch (_) {
+            resumeDisplayName = 'resume.pdf';
+        }
+    }
+    const hasResume = Boolean(activeUser && (activeUser.resume || activeUser.resumeUrl));
+    %>
+
     <% const pmisStatus = (typeof eligibility !== 'undefined' && eligibility) 
         ? eligibility 
         : ((typeof checkPmisEligibility === 'function' && activeUser) 
@@ -276,6 +293,39 @@
                                     <%= emp === 'unemployed' ? 'Unemployed / Seeking Internship' : (emp === 'part_time_or_freelance' ? 'Part-time / Freelance' : (emp === 'full_time' ? 'Full-time Employed' : 'Not Specified')) %>
                                 </span>
                             </div>
+                            <div class="col-span-2 pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                    <span class="text-slate-400 font-medium block">Resume on File</span>
+                                    <% if (hasResume) { %>
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 mt-0.5">
+                                            <i class="ph-bold ph-check-circle text-emerald-600 text-sm"></i>
+                                            Resume uploaded: <span class="text-slate-800 font-semibold"><%= resumeDisplayName %></span>
+                                        </span>
+                                    <% } else { %>
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 mt-0.5">
+                                            <i class="ph-bold ph-warning-circle text-amber-600 text-sm"></i>
+                                            No resume currently on file
+                                        </span>
+                                    <% } %>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <% if (hasResume) { %>
+                                        <a href="<%= activeUser.resume || activeUser.resumeUrl %>" target="_blank"
+                                           class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
+                                            <i class="ph-bold ph-arrow-square-out"></i> View
+                                        </a>
+                                        <button type="button" onclick="window.showResumeReplace && window.showResumeReplace()"
+                                                class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer">
+                                            <i class="ph-bold ph-arrows-clockwise"></i> Replace
+                                        </button>
+                                    <% } else { %>
+                                        <button type="button" onclick="window.showResumeReplace && window.showResumeReplace()"
+                                                class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer">
+                                            <i class="ph-bold ph-upload-simple"></i> Upload Resume
+                                        </button>
+                                    <% } %>
+                                </div>
+                            </div>
                         </div>
 
                         <div
@@ -486,83 +536,170 @@
                 </div>
 
                 <div class="space-y-6">
-                    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-                        <h2
-                            class="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            AI Resume Parser
-                        </h2>
+                    <div id="resumeUploadCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="ph-bold ph-file-text text-indigo-600 text-lg"></i>
+                                Resume Status & Parser
+                            </h2>
+                            <span id="resumeStatusBadge"
+                                class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border <%= hasResume ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200' %>">
+                                <i class="ph-bold <%= hasResume ? 'ph-check-circle text-emerald-600' : 'ph-warning-circle text-amber-600' %>"></i>
+                                <%= hasResume ? 'On File' : 'Not Uploaded' %>
+                            </span>
+                        </div>
 
-                        <form action="/candidate/parse-resume" method="POST" enctype="multipart/form-data"
-                            class="space-y-4" data-loading-text="Parsing Resume...">
-                            <div
-                                class="border-2 border-dashed border-indigo-200 rounded-xl p-6 text-center bg-indigo-50/50 hover:bg-indigo-50 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-500 mx-auto mb-2"
-                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                                <label for="resumeInput"
-                                    class="text-xs font-semibold text-indigo-700 cursor-pointer block hover:underline">
-                                    Upload Resume (PDF)
-                                </label>
-                                <input id="resumeInput" type="file" name="resume" accept=".pdf" class="hidden"
-                                    onchange="document.getElementById('fileName').innerText = this.files[0] ? this.files[0].name : ''">
-                                <p id="fileName" class="text-xs text-slate-600 font-medium mt-2 truncate"></p>
+                        <!-- Persistent Resume Info or Empty Warning -->
+                        <% if (hasResume) { %>
+                            <div class="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4 space-y-3">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xl shrink-0">
+                                        <i class="ph-bold ph-file-pdf"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <p class="text-xs font-bold text-slate-900 truncate" title="<%= resumeDisplayName %>">
+                                                Resume uploaded: <span class="text-indigo-900 font-semibold"><%= resumeDisplayName %></span>
+                                            </p>
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                Active
+                                            </span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">
+                                            <% if (activeUser && activeUser.resumeUploadedAt) { %>
+                                                Uploaded on <%= new Date(activeUser.resumeUploadedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                                            <% } else { %>
+                                                Active resume on file — visible to recruiters
+                                            <% } %>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2 pt-2 border-t border-indigo-100/70">
+                                    <a href="<%= activeUser.resume || activeUser.resumeUrl %>" target="_blank"
+                                       class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-xs">
+                                        <i class="ph-bold ph-arrow-square-out"></i>
+                                        View Resume
+                                    </a>
+                                    <button type="button" id="toggleReplaceResumeBtn"
+                                            class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer">
+                                        <i class="ph-bold ph-arrows-clockwise"></i>
+                                        Replace Resume
+                                    </button>
+                                </div>
+                            </div>
+                        <% } else { %>
+                            <div class="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-800">
+                                <i class="ph-bold ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5"></i>
+                                <div class="space-y-1">
+                                    <p class="font-bold text-amber-900">No resume currently on file</p>
+                                    <p class="text-amber-700">Recruiters rely on your resume to evaluate applications. Upload your resume so employers can review your qualifications.</p>
+                                </div>
+                            </div>
+                        <% } %>
+
+                        <!-- Upload / Replace Resume Form -->
+                        <div id="resumeFormWrapper" class="<%= hasResume ? 'hidden' : '' %> space-y-3 pt-1">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-bold text-slate-700">
+                                    <%= hasResume ? 'Replace Uploaded Resume' : 'Upload New Resume' %>
+                                </h3>
+                                <% if (hasResume) { %>
+                                    <button type="button" id="cancelReplaceBtn" class="text-[11px] text-slate-500 hover:text-slate-800 font-semibold cursor-pointer">
+                                        Cancel
+                                    </button>
+                                <% } %>
                             </div>
 
-                            <% if (activeUser && activeUser.resume) { %>
-                                <div class="bg-indigo-50/50 border border-indigo-100 rounded-lg p-2.5 text-center">
-                                    <a href="<%= activeUser.resume %>" target="_blank"
-                                        class="text-xs text-indigo-700 hover:underline font-semibold flex items-center justify-center gap-1.5">
-                                        View Currently Uploaded Resume
-                                    </a>
+                            <form id="resumeUploadForm" action="/candidate/parse-resume" method="POST" enctype="multipart/form-data"
+                                class="space-y-3" data-loading-text="<%= hasResume ? 'Replacing & Parsing Resume...' : 'Uploading & Parsing Resume...' %>">
+                                
+                                <div id="resumeDropzone"
+                                    class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-5 text-center bg-indigo-50/40 hover:bg-indigo-50 transition-all cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-500 mx-auto mb-2 pointer-events-none"
+                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                    <p class="text-xs font-bold text-indigo-700 mb-0.5 pointer-events-none">
+                                        <%= hasResume ? 'Choose replacement file or drag & drop' : 'Choose resume or drag & drop' %>
+                                    </p>
+                                    <p class="text-[11px] text-slate-500 pointer-events-none">
+                                        Supports PDF or Word documents (.pdf, .docx, .doc) up to 5MB
+                                    </p>
+                                    <input id="resumeInput" type="file" name="resume" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="hidden">
+                                </div>
+
+                                <!-- File selection preview -->
+                                <div id="fileSelectionPreview" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 items-center justify-between gap-3 text-xs">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <div class="w-8 h-8 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                            <i id="previewFileIcon" class="ph-bold ph-file-pdf text-base"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <p id="previewFileName" class="font-bold text-slate-800 truncate"></p>
+                                            <p id="previewFileSize" class="text-[11px] text-slate-500"></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="clearFileBtn" class="text-slate-400 hover:text-rose-600 p-1 rounded-md transition-colors" title="Remove selected file">
+                                        <i class="ph-bold ph-x text-sm"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Client inline error alert -->
+                                <div id="resumeClientError" class="hidden bg-rose-50 border border-rose-200 text-rose-700 px-3.5 py-2.5 rounded-xl text-xs flex items-start gap-2 shadow-xs">
+                                    <i class="ph-bold ph-warning-circle text-rose-600 text-base shrink-0 mt-0.5"></i>
+                                    <span id="resumeClientErrorText" class="font-medium"></span>
+                                </div>
+
+                                <button type="submit" id="resumeSubmitBtn"
+                                    class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs py-2.5 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer">
+                                    <i class="ph-bold ph-upload-simple"></i>
+                                    <span><%= hasResume ? 'Upload & Replace Resume' : 'Upload & Extract Details' %></span>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Resume Quality Analysis -->
+                        <% if (activeUser && activeUser.resumeQuality) { %>
+                            <div class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-4 space-y-3">
+                                <div class="flex items-center justify-between border-b border-emerald-100 pb-2">
+                                    <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                        <i class="ph-bold ph-sparkle text-emerald-600"></i>
+                                        Resume Quality Feedback
+                                    </h3>
+                                    <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">AI Analyzed</span>
+                                </div>
+
+                                <% if (activeUser.resumeQuality.quantifiableAchievements && activeUser.resumeQuality.quantifiableAchievements.feedback) { %>
+                                <div>
+                                    <p class="text-[11px] font-bold text-slate-700">Quantifiable Achievements</p>
+                                    <p class="text-xs text-slate-600 leading-relaxed"><%= activeUser.resumeQuality.quantifiableAchievements.feedback %></p>
                                 </div>
                                 <% } %>
 
-                                <% if (activeUser && activeUser.resumeQuality) { %>
-                                    <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-4 space-y-3">
-                                        <h3 class="text-sm font-bold text-slate-800">Resume Quality Feedback</h3>
-
-                                        <% if (activeUser.resumeQuality.quantifiableAchievements && activeUser.resumeQuality.quantifiableAchievements.feedback) { %>
-                                        <div>
-                                            <p class="text-xs font-semibold text-slate-700">Quantifiable Achievements</p>
-                                            <p class="text-xs text-slate-600"><%= activeUser.resumeQuality.quantifiableAchievements.feedback %></p>
-                                        </div>
-                                        <% } %>
-
-                                        <% if (activeUser.resumeQuality.technicalSkills && activeUser.resumeQuality.technicalSkills.feedback) { %>
-                                        <div>
-                                            <p class="text-xs font-semibold text-slate-700">Technical Skills</p>
-                                            <p class="text-xs text-slate-600"><%= activeUser.resumeQuality.technicalSkills.feedback %></p>
-                                        </div>
-                                        <% } %>
-
-                                        <% if (activeUser.resumeQuality.projects && activeUser.resumeQuality.projects.feedback) { %>
-                                        <div>
-                                            <p class="text-xs font-semibold text-slate-700">Projects</p>
-                                            <p class="text-xs text-slate-600"><%= activeUser.resumeQuality.projects.feedback %></p>
-                                        </div>
-                                        <% } %>
-
-                                        <% if (activeUser.resumeQuality.overallFeedback) { %>
-                                        <div>
-                                            <p class="text-xs font-semibold text-slate-700">Overall Feedback</p>
-                                            <p class="text-xs text-slate-600"><%= activeUser.resumeQuality.overallFeedback %></p>
-                                        </div>
-                                        <% } %>
-                                    </div>
+                                <% if (activeUser.resumeQuality.technicalSkills && activeUser.resumeQuality.technicalSkills.feedback) { %>
+                                <div>
+                                    <p class="text-[11px] font-bold text-slate-700">Technical Skills</p>
+                                    <p class="text-xs text-slate-600 leading-relaxed"><%= activeUser.resumeQuality.technicalSkills.feedback %></p>
+                                </div>
                                 <% } %>
 
-                                <button type="submit"
-                                    class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs py-2.5 rounded-lg transition-colors shadow-sm">
-                                    Extract Details
-                                </button>
-                        </form>
+                                <% if (activeUser.resumeQuality.projects && activeUser.resumeQuality.projects.feedback) { %>
+                                <div>
+                                    <p class="text-[11px] font-bold text-slate-700">Projects</p>
+                                    <p class="text-xs text-slate-600 leading-relaxed"><%= activeUser.resumeQuality.projects.feedback %></p>
+                                </div>
+                                <% } %>
+
+                                <% if (activeUser.resumeQuality.overallFeedback) { %>
+                                <div>
+                                    <p class="text-[11px] font-bold text-slate-700">Overall Feedback</p>
+                                    <p class="text-xs text-slate-600 leading-relaxed"><%= activeUser.resumeQuality.overallFeedback %></p>
+                                </div>
+                                <% } %>
+                            </div>
+                        <% } %>
                     </div>
                 </div>
 
@@ -1101,6 +1238,155 @@
                             </svg>
                             Saving...
                         `;
+                    });
+                }
+
+                // ── Resume Upload & Status Interactions ──────────────────
+                const resumeUploadCard = document.getElementById('resumeUploadCard');
+                const resumeFormWrapper = document.getElementById('resumeFormWrapper');
+                const toggleReplaceBtn = document.getElementById('toggleReplaceResumeBtn');
+                const cancelReplaceBtn = document.getElementById('cancelReplaceBtn');
+                const resumeDropzone = document.getElementById('resumeDropzone');
+                const resumeInput = document.getElementById('resumeInput');
+                const filePreview = document.getElementById('fileSelectionPreview');
+                const previewName = document.getElementById('previewFileName');
+                const previewSize = document.getElementById('previewFileSize');
+                const previewIcon = document.getElementById('previewFileIcon');
+                const clearFileBtn = document.getElementById('clearFileBtn');
+                const resumeClientError = document.getElementById('resumeClientError');
+                const resumeClientErrorText = document.getElementById('resumeClientErrorText');
+                const resumeUploadForm = document.getElementById('resumeUploadForm');
+
+                window.showResumeReplace = function () {
+                    if (resumeFormWrapper) resumeFormWrapper.classList.remove('hidden');
+                    if (resumeUploadCard) resumeUploadCard.scrollIntoView({ behavior: 'smooth' });
+                    if (resumeInput) resumeInput.click();
+                };
+
+                if (toggleReplaceBtn && resumeFormWrapper) {
+                    toggleReplaceBtn.addEventListener('click', () => {
+                        resumeFormWrapper.classList.toggle('hidden');
+                        if (!resumeFormWrapper.classList.contains('hidden') && resumeInput) {
+                            resumeInput.focus();
+                        }
+                    });
+                }
+
+                if (cancelReplaceBtn && resumeFormWrapper) {
+                    cancelReplaceBtn.addEventListener('click', () => {
+                        resumeFormWrapper.classList.add('hidden');
+                        if (resumeInput) resumeInput.value = '';
+                        if (filePreview) {
+                            filePreview.classList.add('hidden');
+                            filePreview.classList.remove('flex');
+                        }
+                        if (resumeClientError) resumeClientError.classList.add('hidden');
+                    });
+                }
+
+                if (resumeDropzone && resumeInput) {
+                    resumeDropzone.addEventListener('click', () => resumeInput.click());
+
+                    ['dragenter', 'dragover'].forEach(eventName => {
+                        resumeDropzone.addEventListener(eventName, (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            resumeDropzone.classList.add('border-indigo-500', 'bg-indigo-100/50');
+                        });
+                    });
+
+                    ['dragleave', 'drop'].forEach(eventName => {
+                        resumeDropzone.addEventListener(eventName, (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            resumeDropzone.classList.remove('border-indigo-500', 'bg-indigo-100/50');
+                        });
+                    });
+
+                    resumeDropzone.addEventListener('drop', (e) => {
+                        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                            resumeInput.files = e.dataTransfer.files;
+                            handleFileSelection(e.dataTransfer.files[0]);
+                        }
+                    });
+                }
+
+                const handleFileSelection = (file) => {
+                    if (!file) return;
+
+                    const maxBytes = 5 * 1024 * 1024;
+                    const allowedExts = ['.pdf', '.doc', '.docx'];
+                    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+
+                    // Check file extension
+                    if (!allowedExts.includes(ext)) {
+                        if (resumeClientError && resumeClientErrorText) {
+                            resumeClientErrorText.textContent = `Invalid file format (${ext}). Only PDF (.pdf) and Word (.docx, .doc) resumes are supported.`;
+                            resumeClientError.classList.remove('hidden');
+                        }
+                        if (filePreview) {
+                            filePreview.classList.add('hidden');
+                            filePreview.classList.remove('flex');
+                        }
+                        if (resumeInput) resumeInput.value = '';
+                        return;
+                    }
+
+                    // Check file size
+                    if (file.size > maxBytes) {
+                        const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                        if (resumeClientError && resumeClientErrorText) {
+                            resumeClientErrorText.textContent = `File is too large (${sizeMb}MB). Maximum allowed resume size is 5MB.`;
+                            resumeClientError.classList.remove('hidden');
+                        }
+                        if (filePreview) {
+                            filePreview.classList.add('hidden');
+                            filePreview.classList.remove('flex');
+                        }
+                        if (resumeInput) resumeInput.value = '';
+                        return;
+                    }
+
+                    // Valid file
+                    if (resumeClientError) resumeClientError.classList.add('hidden');
+                    if (filePreview && previewName && previewSize && previewIcon) {
+                        previewName.textContent = file.name;
+                        previewSize.textContent = `${(file.size / 1024).toFixed(0)} KB · Ready to upload`;
+                        previewIcon.className = ext === '.pdf' ? 'ph-bold ph-file-pdf text-base' : 'ph-bold ph-file-doc text-base';
+                        filePreview.classList.remove('hidden');
+                        filePreview.classList.add('flex');
+                    }
+                };
+
+                if (resumeInput) {
+                    resumeInput.addEventListener('change', () => {
+                        if (resumeInput.files && resumeInput.files[0]) {
+                            handleFileSelection(resumeInput.files[0]);
+                        }
+                    });
+                }
+
+                if (clearFileBtn) {
+                    clearFileBtn.addEventListener('click', () => {
+                        if (resumeInput) resumeInput.value = '';
+                        if (filePreview) {
+                            filePreview.classList.add('hidden');
+                            filePreview.classList.remove('flex');
+                        }
+                        if (resumeClientError) resumeClientError.classList.add('hidden');
+                    });
+                }
+
+                if (resumeUploadForm) {
+                    resumeUploadForm.addEventListener('submit', (e) => {
+                        if (!resumeInput || !resumeInput.files || resumeInput.files.length === 0) {
+                            e.preventDefault();
+                            if (resumeClientError && resumeClientErrorText) {
+                                resumeClientErrorText.textContent = 'Please select a resume file (PDF or Word) before uploading.';
+                                resumeClientError.classList.remove('hidden');
+                            }
+                            return;
+                        }
                     });
                 }
             });

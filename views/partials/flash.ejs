@@ -8,7 +8,7 @@ const allErrors = [...errorMessages, ...passportErrors];
 <% if (successMessages.length > 0) { %>
     <div class="space-y-2 mb-6">
         <% successMessages.forEach(msg => { %>
-            <div class="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl shadow-sm transition-all" role="alert">
+            <div data-flash-alert class="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl shadow-sm transition-all" role="alert">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
                         <i class="ph-bold ph-check text-base"></i>
@@ -26,7 +26,7 @@ const allErrors = [...errorMessages, ...passportErrors];
 <% if (allErrors.length > 0) { %>
     <div class="space-y-2 mb-6">
         <% allErrors.forEach(msg => { %>
-            <div class="flex items-center justify-between p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl shadow-sm transition-all" role="alert">
+            <div data-flash-alert class="flex items-center justify-between p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl shadow-sm transition-all" role="alert">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
                         <i class="ph-bold ph-warning-circle text-base"></i>
@@ -40,3 +40,21 @@ const allErrors = [...errorMessages, ...passportErrors];
         <% }) %>
     </div>
 <% } %>
+
+<script>
+    (function () {
+        const alerts = document.querySelectorAll('[data-flash-alert]');
+        alerts.forEach(function (alert) {
+            setTimeout(function () {
+                if (alert && alert.parentElement) {
+                    alert.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-6px)';
+                    setTimeout(function () {
+                        if (alert.parentElement) alert.remove();
+                    }, 400);
+                }
+            }, 6000);
+        });
+    })();
+</script>

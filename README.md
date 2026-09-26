@@ -485,6 +485,13 @@ START2CODE is an initiative event owned and organized by the **GitHub Club under
                 </a>
             </td>
             <td align="center">
+                <a href="https://github.com/archlight20">
+                    <img src="https://avatars.githubusercontent.com/u/120593356?v=4" width="100;" alt="archlight20"/>
+                    <br />
+                    <sub><b>archlight20</b></sub>
+                </a>
+            </td>
+            <td align="center">
                 <a href="https://github.com/huzaifa069HUZ">
                     <img src="https://avatars.githubusercontent.com/u/223731712?v=4" width="100;" alt="huzaifa069HUZ"/>
                     <br />
@@ -506,26 +513,19 @@ START2CODE is an initiative event owned and organized by the **GitHub Club under
                 </a>
             </td>
             <td align="center">
-                <a href="https://github.com/archlight20">
-                    <img src="https://avatars.githubusercontent.com/u/120593356?v=4" width="100;" alt="archlight20"/>
+                <a href="https://github.com/alisayam-786">
+                    <img src="https://avatars.githubusercontent.com/u/233578022?v=4" width="100;" alt="alisayam-786"/>
                     <br />
-                    <sub><b>archlight20</b></sub>
-                </a>
-            </td>
-            <td align="center">
-                <a href="https://github.com/rajeevsahani">
-                    <img src="https://avatars.githubusercontent.com/u/10737960?v=4" width="100;" alt="rajeevsahani"/>
-                    <br />
-                    <sub><b>Rajeev Kumar</b></sub>
+                    <sub><b>Ali Sayam</b></sub>
                 </a>
             </td>
 		</tr>
 		<tr>
             <td align="center">
-                <a href="https://github.com/alisayam-786">
-                    <img src="https://avatars.githubusercontent.com/u/233578022?v=4" width="100;" alt="alisayam-786"/>
+                <a href="https://github.com/rajeevsahani">
+                    <img src="https://avatars.githubusercontent.com/u/10737960?v=4" width="100;" alt="rajeevsahani"/>
                     <br />
-                    <sub><b>Ali Sayam</b></sub>
+                    <sub><b>Rajeev Kumar</b></sub>
                 </a>
             </td>
             <td align="center">

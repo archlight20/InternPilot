@@ -39,6 +39,7 @@ const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const activityRoutes = require('./routes/activity');
 const pagesRoutes = require('./routes/pages');
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -118,6 +119,10 @@ async function main() {
     await mongoose.connect(process.env.ATLASDB_URL);
 }
 
+// In-app messaging (#136). Mounted before every page route so its unread
+// count is available to the header on all pages, the homepage included.
+app.use(require('./routes/messages'));
+
 // Homepage Route (Renders views/extras/index.ejs)
 app.get('/', async (req, res) => {
     try {
@@ -144,6 +149,10 @@ app.use('/', chatRoutes);
 app.use('/', notificationRoutes);
 app.use('/', activityRoutes);
 app.use('/api', activityRoutes);
+app.use('/api/v1', analyticsRoutes);
+
+// Ignore favicon requests to avoid noisy 404 logs in console
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // 404 Catch-All Handler (Forward to error handler)
 app.use((req, res, next) => {

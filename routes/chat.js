@@ -178,7 +178,7 @@ const generateGeminiReply = async (systemPrompt, userMessage) => {
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
         contents: [
             { role: 'user', parts: [{ text: systemPrompt }, { text: `Candidate Message: ${userMessage}` }] }
         ]

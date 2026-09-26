@@ -1,0 +1,30 @@
+<%
+    // Classes copied from the header's own nav helpers: those are locals of
+    // header.ejs and are not visible from inside an include.
+    const msgUser = typeof currentUser !== 'undefined' ? currentUser : null;
+    const msgRoles = ['candidate', 'company', 'recruiter', 'hiring_manager'];
+%>
+<% if (msgUser && msgRoles.includes(msgUser.role)) { %>
+<%
+    const msgCount = typeof messageUnreadCount === 'number' ? messageUnreadCount : 0;
+    const msgBadge = msgCount > 99 ? '99+' : String(msgCount);
+    const msgPath = typeof currentPath === 'string' ? currentPath : '';
+    const msgActive = msgPath === '/messages' || msgPath.startsWith('/messages/');
+    const msgVariant = typeof variant !== 'undefined' ? variant : 'icon';
+%>
+<% if (msgVariant === 'mobile') { %>
+    <a href="/messages" data-nav-link data-nav-variant="mobile" data-nav-prefixes="/messages"
+        class="nav-link block rounded-lg border-l-4 px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 <%= msgActive ? 'border-indigo-700 bg-indigo-50 text-indigo-900 font-bold' : 'border-transparent text-slate-600 font-semibold hover:bg-slate-100 hover:text-indigo-700' %>"
+        <%- msgActive ? 'aria-current="page"' : '' %>>Messages<% if (msgCount > 0) { %> (<%= msgBadge %>)<% } %></a>
+<% } else { %>
+    <a href="/messages" aria-label="Messages<%= msgCount > 0 ? ', ' + msgBadge + ' unread' : '' %>" title="Messages"
+        data-nav-link data-nav-variant="icon" data-nav-prefixes="/messages"
+        class="relative inline-flex items-center justify-center rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 <%= msgActive ? 'bg-indigo-100 font-bold text-indigo-900 ring-1 ring-indigo-700' : '' %>"
+        <%- msgActive ? 'aria-current="page"' : '' %>>
+        <i class="ph-bold ph-chat-circle-text text-lg" aria-hidden="true"></i>
+        <% if (msgCount > 0) { %>
+            <span class="absolute -right-0.5 -top-0.5 h-4 min-w-4 rounded-full bg-rose-600 px-1 text-center text-[9px] font-bold leading-4 text-white"><%= msgBadge %></span>
+        <% } %>
+    </a>
+<% } %>
+<% } %>
