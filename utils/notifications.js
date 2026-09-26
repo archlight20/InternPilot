@@ -3,12 +3,112 @@ const User = require('../models/User');
 const Internship = require('../models/Internship');
 const Application = require('../models/Application');
 const SavedSearch = require('../models/SavedSearch');
+const SavedSearchAlertDelivery = require('../models/SavedSearchAlertDelivery');
+const { randomUUID } = require('crypto');
 const { skillNames } = require('./skillProfiles');
 const {
     matchesInternshipCriteria,
     buildSavedSearchResultsUrl
 } = require('./queryHelper');
 const { sendSavedSearchAlertEmail } = require('./sendEmail');
+
+const INSTANT_EMAIL_CONCURRENCY = 5;
+const INSTANT_EMAIL_LEASE_MS = 15 * 60 * 1000;
+
+function isDuplicateKeyError(error) {
+    return error?.code === 11000 || error?.codeName === 'DuplicateKey';
+}
+
+/**
+ * Runs asynchronous work with a small, explicit concurrency bound. SMTP
+ * providers throttle bursts aggressively; unbounded Promise.all can turn one
+ * popular listing into hundreds of simultaneous connection attempts.
+ */
+async function mapWithConcurrency(items, limit, worker) {
+    const input = Array.isArray(items) ? items : [];
+    if (!input.length) return [];
+
+    const results = new Array(input.length);
+    const workerCount = Math.min(Math.max(1, limit || 1), input.length);
+    let nextIndex = 0;
+
+    async function runWorker() {
+        while (nextIndex < input.length) {
+            const index = nextIndex;
+            nextIndex += 1;
+            results[index] = await worker(input[index], index);
+        }
+    }
+
+    await Promise.all(Array.from({ length: workerCount }, runWorker));
+    return results;
+}
+
+/**
+ * Atomically claims one candidate/listing e-mail. A sent record is permanent;
+ * a short lease lets a later job recover if the process dies while SMTP work
+ * is in flight. A duplicate-key result simply means another worker owns it.
+ */
+async function claimInstantEmailDelivery(candidateId, internshipId, now = new Date()) {
+    if (!candidateId || !internshipId) return null;
+
+    const claimToken = randomUUID();
+    const leaseExpiresAt = new Date(now.getTime() + INSTANT_EMAIL_LEASE_MS);
+    try {
+        return await SavedSearchAlertDelivery.findOneAndUpdate(
+            {
+                candidate: candidateId,
+                internship: internshipId,
+                channel: 'instant_email',
+                $or: [
+                    { status: { $exists: false } },
+                    { status: 'sending', leaseExpiresAt: { $lte: now } }
+                ]
+            },
+            {
+                $set: {
+                    status: 'sending',
+                    claimToken,
+                    leaseExpiresAt
+                },
+                $setOnInsert: {
+                    candidate: candidateId,
+                    internship: internshipId,
+                    channel: 'instant_email'
+                }
+            },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+    } catch (error) {
+        if (isDuplicateKeyError(error)) return null;
+        throw error;
+    }
+}
+
+async function markInstantEmailDelivered(claim, now = new Date()) {
+    if (!claim?._id || !claim.claimToken) return;
+    await SavedSearchAlertDelivery.updateOne(
+        { _id: claim._id, status: 'sending', claimToken: claim.claimToken },
+        {
+            $set: { status: 'sent', sentAt: now },
+            $unset: { leaseExpiresAt: 1 }
+        }
+    );
+}
+
+async function releaseInstantEmailClaim(claim) {
+    if (!claim?._id || !claim.claimToken) return;
+    try {
+        await SavedSearchAlertDelivery.deleteOne({
+            _id: claim._id,
+            status: 'sending',
+            claimToken: claim.claimToken
+        });
+    } catch (error) {
+        // The lease still makes this recoverable if deletion itself fails.
+        console.error('Failed to release saved-search e-mail delivery claim:', error.message);
+    }
+}
 
 function normalise(value) {
     return (value || '').trim().toLowerCase();
@@ -157,31 +257,50 @@ async function notifyRelevantCandidates(internship) {
     }
 
     // Email-only and "both" instant alerts are sent once per candidate/listing
-    // even when more than one saved search matches.
-    const emailSearchIds = [];
-    const emailRecipients = [...savedMatchesByCandidate.values()].map(async group => {
-        const matchingSearches = group.matches.filter(search =>
-            search.frequency === 'instant' && search.delivery?.email === true
-        );
-        if (!matchingSearches.length || !group.candidate.email) return;
-
-        try {
-            await sendSavedSearchAlertEmail(
-                group.candidate.email,
-                group.candidate.name,
-                matchingSearches.map(search => search.name),
-                [internship],
-                'instant',
-                buildSavedSearchResultsUrl(matchingSearches[0].criteria)
+    // even when more than one saved search matches. The durable claim both
+    // prevents duplicates after a resume/retry and bounds SMTP pressure.
+    const emailResults = await mapWithConcurrency(
+        [...savedMatchesByCandidate.values()],
+        INSTANT_EMAIL_CONCURRENCY,
+        async group => {
+            const matchingSearches = group.matches.filter(search =>
+                search.frequency === 'instant' && search.delivery?.email === true
             );
-            emailSearchIds.push(...matchingSearches.map(search => search._id));
-        } catch (error) {
-            // E-mail delivery must not make publishing an internship fail; the
-            // in-app notification remains available when the candidate chose it.
-            console.error('Failed to send saved-search instant alert:', error.message);
+            if (!matchingSearches.length || !group.candidate.email) {
+                return { candidateId: identifier(group.candidate), searchIds: [], delivered: false };
+            }
+
+            let claim = null;
+            try {
+                claim = await claimInstantEmailDelivery(group.candidate._id, internship._id, now);
+                if (!claim) {
+                    return { candidateId: identifier(group.candidate), searchIds: [], delivered: false };
+                }
+
+                await sendSavedSearchAlertEmail(
+                    group.candidate.email,
+                    group.candidate.name,
+                    matchingSearches.map(search => search.name),
+                    [internship],
+                    'instant',
+                    buildSavedSearchResultsUrl(matchingSearches[0].criteria)
+                );
+                await markInstantEmailDelivered(claim, now);
+                return {
+                    candidateId: identifier(group.candidate),
+                    searchIds: matchingSearches.map(search => search._id),
+                    delivered: true
+                };
+            } catch (error) {
+                // E-mail delivery must not make publishing an internship fail;
+                // deleting this token allows a later publish/job to retry it.
+                await releaseInstantEmailClaim(claim);
+                console.error('Failed to send saved-search instant alert:', error.message);
+                return { candidateId: identifier(group.candidate), searchIds: [], delivered: false };
+            }
         }
-    });
-    await Promise.all(emailRecipients);
+    );
+    const emailSearchIds = emailResults.flatMap(result => result.searchIds || []);
 
     const deliveredSearchIds = [...new Set([...inAppSavedSearchIds, ...emailSearchIds].map(identifier).filter(Boolean))];
     if (deliveredSearchIds.length) {
@@ -193,14 +312,20 @@ async function notifyRelevantCandidates(internship) {
 
     const alertedCandidateIds = new Set([
         ...immediateRecipients.keys(),
-        ...[...savedMatchesByCandidate.entries()]
-            .filter(([, group]) => group.matches.some(search => search.frequency === 'instant' && search.delivery?.email === true))
-            .map(([candidateId]) => candidateId)
+        ...emailResults.filter(result => result.delivered).map(result => result.candidateId)
     ]);
     return alertedCandidateIds.size;
 }
 
-function timestampFromInternship(internship) {
+function publicationTimestampFromInternship(internship) {
+    if (internship?.publishedAt) {
+        const value = new Date(internship.publishedAt);
+        if (!Number.isNaN(value.getTime())) return value;
+    }
+
+    // Legacy listings predate publishedAt. Their original creation time is
+    // the best available fallback; all new publish/resume transitions write
+    // a real publication timestamp in the Internship model.
     if (internship?.createdAt) {
         const value = new Date(internship.createdAt);
         if (!Number.isNaN(value.getTime())) return value;
@@ -212,6 +337,22 @@ function timestampFromInternship(internship) {
 function digestKey(frequency, now) {
     const date = new Date(now);
     return `${frequency}:${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
+function digestPayload(entries) {
+    const searchNames = [...new Set(entries.map(entry => entry.savedSearch.name).filter(Boolean))];
+    const internships = [...new Map(
+        entries.flatMap(entry => entry.matches).map(internship => [identifier(internship), internship])
+    ).values()];
+    return { searchNames, internships };
+}
+
+function shouldAdvanceDigestCheckpoint(savedSearch, { hasMatches, inAppDelivered, emailDelivered }) {
+    if (!hasMatches) return true;
+
+    const wantsInApp = savedSearch.delivery?.inApp !== false;
+    const wantsEmail = savedSearch.delivery?.email === true;
+    return (wantsInApp && inAppDelivered) || (wantsEmail && emailDelivered);
 }
 
 /**
@@ -263,6 +404,7 @@ async function runSavedSearchDigests(frequency, now = new Date()) {
     });
 
     const grouped = new Map();
+    const checkpointIds = new Set();
     savedSearches.forEach(savedSearch => {
         const candidate = candidatesById.get(identifier(savedSearch.candidate));
         if (!candidate) return;
@@ -270,12 +412,16 @@ async function runSavedSearchDigests(frequency, now = new Date()) {
         const safeSince = Number.isNaN(since.getTime()) ? now : since;
         const alreadyApplied = appliedByCandidate.get(identifier(candidate)) || new Set();
         const matches = internships.filter(internship => {
-            const publishedAt = timestampFromInternship(internship);
+            const publishedAt = publicationTimestampFromInternship(internship);
             return publishedAt && publishedAt.getTime() > safeSince.getTime()
                 && !alreadyApplied.has(identifier(internship))
                 && matchesInternshipCriteria(internship, savedSearch.criteria, now);
         });
-        if (!matches.length) return;
+        if (!matches.length) {
+            // A digest window with no matching listing is safe to advance.
+            checkpointIds.add(identifier(savedSearch._id));
+            return;
+        }
 
         const candidateId = identifier(candidate);
         const entry = grouped.get(candidateId) || { candidate, searches: [] };
@@ -285,42 +431,53 @@ async function runSavedSearchDigests(frequency, now = new Date()) {
 
     let delivered = 0;
     for (const { candidate, searches } of grouped.values()) {
-        const searchNames = [...new Set(searches.map(entry => entry.savedSearch.name).filter(Boolean))];
-        const internshipsForDigest = [...new Map(
-            searches.flatMap(entry => entry.matches).map(internship => [identifier(internship), internship])
-        ).values()];
-        const wantsInApp = searches.some(entry => entry.savedSearch.delivery?.inApp !== false);
-        const wantsEmail = searches.some(entry => entry.savedSearch.delivery?.email === true);
-        const message = `${internshipsForDigest.length} new internship${internshipsForDigest.length === 1 ? '' : 's'} match your ${frequency} saved searches.`;
+        const inAppEntries = searches.filter(entry => entry.savedSearch.delivery?.inApp !== false);
+        const emailEntries = searches.filter(entry => entry.savedSearch.delivery?.email === true);
         const key = digestKey(frequency, now);
+        let inAppDelivered = false;
+        let emailDelivered = false;
 
-        if (wantsInApp) {
-            await Notification.updateOne(
-                {
-                    recipient: candidate._id,
-                    type: 'saved_search_digest',
-                    'metadata.digestKey': key
-                },
-                {
-                    $setOnInsert: {
+        if (inAppEntries.length) {
+            const { searchNames, internships: internshipsForDigest } = digestPayload(inAppEntries);
+            const message = `${internshipsForDigest.length} new internship${internshipsForDigest.length === 1 ? '' : 's'} match your ${frequency} saved searches.`;
+            try {
+                await Notification.updateOne(
+                    {
                         recipient: candidate._id,
                         type: 'saved_search_digest',
-                        title: `${frequency[0].toUpperCase()}${frequency.slice(1)} internship matches`,
-                        message,
-                        link: '/candidate/saved-searches',
-                        metadata: {
-                            digestKey: key,
-                            internshipCount: internshipsForDigest.length,
-                            searchNames
-                        },
-                        isRead: false
-                    }
-                },
-                { upsert: true }
-            );
+                        'metadata.digestKey': key
+                    },
+                    {
+                        $setOnInsert: {
+                            recipient: candidate._id,
+                            type: 'saved_search_digest',
+                            title: `${frequency[0].toUpperCase()}${frequency.slice(1)} internship matches`,
+                            message,
+                            link: '/candidate/saved-searches',
+                            metadata: {
+                                digestKey: key,
+                                internshipCount: internshipsForDigest.length,
+                                searchNames
+                            },
+                            isRead: false
+                        }
+                    },
+                    { upsert: true }
+                );
+                inAppDelivered = true;
+            } catch (error) {
+                // Another scheduler may have inserted the same daily/weekly
+                // notification. In that case the candidate already has it.
+                if (isDuplicateKeyError(error)) {
+                    inAppDelivered = true;
+                } else {
+                    console.error('Failed to create saved-search in-app digest:', error.message);
+                }
+            }
         }
 
-        if (wantsEmail && candidate.email) {
+        if (emailEntries.length && candidate.email) {
+            const { searchNames, internships: internshipsForDigest } = digestPayload(emailEntries);
             try {
                 await sendSavedSearchAlertEmail(
                     candidate.email,
@@ -330,20 +487,34 @@ async function runSavedSearchDigests(frequency, now = new Date()) {
                     frequency,
                     '/candidate/saved-searches'
                 );
+                emailDelivered = true;
             } catch (error) {
                 console.error('Failed to send saved-search digest:', error.message);
             }
         }
 
-        if (wantsInApp || wantsEmail) delivered += 1;
+        if (inAppDelivered || emailDelivered) delivered += 1;
+
+        searches.forEach(({ savedSearch }) => {
+            if (shouldAdvanceDigestCheckpoint(savedSearch, {
+                hasMatches: true,
+                inAppDelivered,
+                emailDelivered
+            })) {
+                checkpointIds.add(identifier(savedSearch._id));
+            }
+        });
     }
 
-    // Move each requested digest window forward even when no listing matched;
-    // this prevents a future run from scanning the same historical window.
-    await SavedSearch.updateMany(
-        { _id: { $in: savedSearches.map(search => search._id) } },
-        { $set: { lastDigestAt: now } }
-    );
+    // Do not discard an e-mail-only search's window after an SMTP failure. A
+    // no-match window, or one delivered through at least one chosen channel,
+    // can advance safely. $max also protects overlapping scheduler runs.
+    if (checkpointIds.size) {
+        await SavedSearch.updateMany(
+            { _id: { $in: [...checkpointIds] } },
+            { $max: { lastDigestAt: now } }
+        );
+    }
     return delivered;
 }
 
@@ -403,6 +574,11 @@ module.exports = {
     isRelevantInternship,
     notifyRelevantCandidates,
     runSavedSearchDigests,
+    // Exported small pure helpers keep scheduling and SMTP safeguards covered
+    // without requiring a database or a real mail provider in tests.
+    mapWithConcurrency,
+    publicationTimestampFromInternship,
+    shouldAdvanceDigestCheckpoint,
     notifyApplicationStatusChange,
     notifyInterviewScheduled,
     notifyInterviewRescheduled,

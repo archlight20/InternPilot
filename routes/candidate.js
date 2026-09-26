@@ -88,6 +88,29 @@ function isValidSavedSearchId(value) {
     return mongoose.Types.ObjectId.isValid(value);
 }
 
+// MongoDB is the final authority for the candidate + criteriaHash unique
+// index. The read-before-write checks below make the common path friendly,
+// while this recognises the small window where two identical requests reach
+// the index at the same time.
+function isSavedSearchDuplicateKeyError(error) {
+    if (error?.code !== 11000) return false;
+
+    const keyPattern = error.keyPattern;
+    return !keyPattern || (
+        Object.prototype.hasOwnProperty.call(keyPattern, 'candidate')
+        && Object.prototype.hasOwnProperty.call(keyPattern, 'criteriaHash')
+    );
+}
+
+function applyRepeatedSavedSearchSettings(savedSearch, { name, frequency, delivery, now }) {
+    savedSearch.name = name;
+    savedSearch.frequency = frequency;
+    savedSearch.delivery = delivery;
+    savedSearch.isPaused = false;
+    savedSearch.alertStartAt = now;
+    if (frequency === 'daily' || frequency === 'weekly') savedSearch.lastDigestAt = now;
+}
+
 async function getPublishedListingsForSavedSearches() {
     const now = new Date();
     return Internship.find({
@@ -209,12 +232,7 @@ router.post('/candidate/saved-searches', isAuthenticated, authorize('candidate')
         const existing = await SavedSearch.findOne({ candidate: req.user._id, criteriaHash });
 
         if (existing) {
-            existing.name = name;
-            existing.frequency = frequency;
-            existing.delivery = delivery;
-            existing.isPaused = false;
-            existing.alertStartAt = now;
-            if (frequency === 'daily' || frequency === 'weekly') existing.lastDigestAt = now;
+            applyRepeatedSavedSearchSettings(existing, { name, frequency, delivery, now });
             await existing.save();
             if (req.flash) req.flash('success_msg', 'Updated your existing saved search and alert preferences.');
             return res.redirect(returnTo);
@@ -222,25 +240,55 @@ router.post('/candidate/saved-searches', isAuthenticated, authorize('candidate')
 
         const currentCount = await SavedSearch.countDocuments({ candidate: req.user._id });
         if (currentCount >= MAX_SAVED_SEARCHES) {
+            // A concurrent matching save can occupy the final slot between
+            // the first lookup and this count. It is still an idempotent
+            // update, not a new eleventh search.
+            const concurrentSearch = await SavedSearch.findOne({ candidate: req.user._id, criteriaHash });
+            if (concurrentSearch) {
+                applyRepeatedSavedSearchSettings(concurrentSearch, { name, frequency, delivery, now });
+                await concurrentSearch.save();
+                if (req.flash) req.flash('success_msg', 'Updated your existing saved search and alert preferences.');
+                return res.redirect(returnTo);
+            }
             throw new Error(`You can save up to ${MAX_SAVED_SEARCHES} searches. Delete or edit an existing one first.`);
         }
 
-        await SavedSearch.create({
-            candidate: req.user._id,
-            name,
-            criteria,
-            criteriaHash,
-            frequency,
-            delivery,
-            alertStartAt: now,
-            lastDigestAt: frequency === 'daily' || frequency === 'weekly' ? now : undefined
-        });
+        try {
+            await SavedSearch.create({
+                candidate: req.user._id,
+                name,
+                criteria,
+                criteriaHash,
+                frequency,
+                delivery,
+                alertStartAt: now,
+                lastDigestAt: frequency === 'daily' || frequency === 'weekly' ? now : undefined
+            });
+        } catch (error) {
+            if (!isSavedSearchDuplicateKeyError(error)) throw error;
+
+            // A concurrent request saved the same filters after our initial
+            // lookup. Update that one record so repeat saves stay idempotent
+            // instead of exposing an E11000 error to the candidate.
+            const concurrentSearch = await SavedSearch.findOne({ candidate: req.user._id, criteriaHash });
+            if (!concurrentSearch) {
+                throw new Error('This saved search changed while it was being saved. Please try again.');
+            }
+
+            applyRepeatedSavedSearchSettings(concurrentSearch, { name, frequency, delivery, now });
+            await concurrentSearch.save();
+            if (req.flash) req.flash('success_msg', 'Updated your existing saved search and alert preferences.');
+            return res.redirect(returnTo);
+        }
 
         if (req.flash) req.flash('success_msg', 'Search saved. We will alert you when new matches are published.');
         return res.redirect(returnTo);
     } catch (error) {
         console.error('Error saving internship search:', error);
-        if (req.flash) req.flash('error_msg', error.message || 'Unable to save this search. Please try again.');
+        const message = isSavedSearchDuplicateKeyError(error)
+            ? 'A matching saved search was updated at the same time. Please try again.'
+            : (error.message || 'Unable to save this search. Please try again.');
+        if (req.flash) req.flash('error_msg', message);
         return res.redirect(returnTo);
     }
 });
@@ -295,7 +343,10 @@ router.patch('/candidate/saved-searches/:id', isAuthenticated, authorize('candid
         return res.redirect(returnTo);
     } catch (error) {
         console.error('Error updating saved search:', error);
-        if (req.flash) req.flash('error_msg', error.message || 'Unable to update this saved search.');
+        const message = isSavedSearchDuplicateKeyError(error)
+            ? 'You already have a saved search with those filters.'
+            : (error.message || 'Unable to update this saved search.');
+        if (req.flash) req.flash('error_msg', message);
         return res.redirect(returnTo);
     }
 });
