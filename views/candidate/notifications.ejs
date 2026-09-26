@@ -40,6 +40,8 @@
                             typeStyle = { icon: 'ph-trophy', iconClass: 'bg-emerald-100 text-emerald-700', label: 'Shortlisted' };
                         } else if (notification.type === 'new_matching_internship') {
                             typeStyle = { icon: 'ph-sparkle', iconClass: 'bg-indigo-100 text-indigo-700', label: 'New match' };
+                        } else if (notification.type === 'saved_search_digest') {
+                            typeStyle = { icon: 'ph-bell-ringing', iconClass: 'bg-violet-100 text-violet-700', label: 'Saved-search digest' };
                         } else if (notification.type === 'interview_scheduled' || notification.type === 'interview_rescheduled') {
                             typeStyle = { icon: 'ph-calendar-check', iconClass: 'bg-indigo-100 text-indigo-700', label: 'Interview Scheduled' };
                         } else if (notification.type === 'interview_cancelled') {

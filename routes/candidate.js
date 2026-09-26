@@ -8,6 +8,8 @@ const router = express.Router();
 
 const Application = require('../models/Application');
 const User = require('../models/User');
+const Internship = require('../models/Internship');
+const SavedSearch = require('../models/SavedSearch');
 const { notifyCandidateWithdrawal } = require('../utils/recruiterNotifications');
 const { isAuthenticated, authorize } = require('../middleware/auth');
 const { formatRelativeTime, formatLocalizedDateTime } = require('../utils/dateFormat');
@@ -59,6 +61,278 @@ router.post('/candidate/saved-internships/:id/toggle', isAuthenticated, authoriz
     } catch (error) {
         console.error('Error toggling saved internship:', error);
         res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+/**
+ * GET /candidate/saved-searches
+ * Shows saved filters with an accurate current-match count and a compact
+ * preview. The same pure matcher is used when an alert is delivered.
+ */
+router.get('/candidate/saved-searches', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        const [savedSearches, publishedInternships] = await Promise.all([
+            SavedSearch.find({ candidate: req.user._id }).sort({ updatedAt: -1 }).lean(),
+            getPublishedListingsForSavedSearches()
+        ]);
+
+        const savedSearchCards = savedSearches.map(savedSearch => {
+            const matches = publishedInternships.filter(internship =>
+                matchesInternshipCriteria(internship, savedSearch.criteria)
+            );
+
+            return {
+                ...savedSearch,
+                criteriaLabels: describeSavedSearchCriteria(savedSearch.criteria),
+                resultsUrl: buildSavedSearchResultsUrl(savedSearch.criteria),
+                matchingCount: matches.length,
+                matchingPreview: matches.slice(0, 3)
+            };
+        });
+
+        res.render('candidate/saved-searches', {
+            currentUser: req.user,
+            savedSearches: savedSearchCards,
+            maxSavedSearches: MAX_SAVED_SEARCHES
+        });
+    } catch (error) {
+        console.error('Error loading saved searches:', error);
+        if (req.flash) req.flash('error_msg', 'Failed to load saved searches. Please try again.');
+        res.redirect('/internships');
+    }
+});
+
+/**
+ * POST /candidate/saved-searches
+ * Persists a normalized copy of the selected filters. A candidate can save a
+ * given criterion set once; re-saving it updates its alert preferences.
+ */
+router.post('/candidate/saved-searches', isAuthenticated, authorize('candidate'), async (req, res) => {
+    const returnTo = savedSearchReturnPath(req, '/internships');
+
+    try {
+        const criteria = parseSavedSearchCriteria(req.body?.criteria);
+        if (!hasSavedSearchCriteria(criteria)) {
+            throw new Error('Choose at least one filter before saving this search.');
+        }
+
+        const name = getSavedSearchName(req.body?.name);
+        const { frequency, delivery } = getAlertSettings(req.body);
+        const criteriaHash = getSavedSearchCriteriaHash(criteria);
+        const now = new Date();
+        const existing = await SavedSearch.findOne({ candidate: req.user._id, criteriaHash });
+
+        if (existing) {
+            applyRepeatedSavedSearchSettings(existing, { name, frequency, delivery, now });
+            await existing.save();
+            if (req.flash) req.flash('success_msg', 'Updated your existing saved search and alert preferences.');
+            return res.redirect(returnTo);
+        }
+
+        const currentCount = await SavedSearch.countDocuments({ candidate: req.user._id });
+        if (currentCount >= MAX_SAVED_SEARCHES) {
+            // A concurrent matching save can occupy the final slot between
+            // the first lookup and this count. It is still an idempotent
+            // update, not a new eleventh search.
+            const concurrentSearch = await SavedSearch.findOne({ candidate: req.user._id, criteriaHash });
+            if (concurrentSearch) {
+                applyRepeatedSavedSearchSettings(concurrentSearch, { name, frequency, delivery, now });
+                await concurrentSearch.save();
+                if (req.flash) req.flash('success_msg', 'Updated your existing saved search and alert preferences.');
+                return res.redirect(returnTo);
+            }
+            throw new Error(`You can save up to ${MAX_SAVED_SEARCHES} searches. Delete or edit an existing one first.`);
+        }
+
+        try {
+            await SavedSearch.create({
+                candidate: req.user._id,
+                name,
+                criteria,
+                criteriaHash,
+                frequency,
+                delivery,
+                alertStartAt: now,
+                lastDigestAt: frequency === 'daily' || frequency === 'weekly' ? now : undefined
+            });
+        } catch (error) {
+            if (!isSavedSearchDuplicateKeyError(error)) throw error;
+
+            // A concurrent request saved the same filters after our initial
+            // lookup. Update that one record so repeat saves stay idempotent
+            // instead of exposing an E11000 error to the candidate.
+            const concurrentSearch = await SavedSearch.findOne({ candidate: req.user._id, criteriaHash });
+            if (!concurrentSearch) {
+                throw new Error('This saved search changed while it was being saved. Please try again.');
+            }
+
+            applyRepeatedSavedSearchSettings(concurrentSearch, { name, frequency, delivery, now });
+            await concurrentSearch.save();
+            if (req.flash) req.flash('success_msg', 'Updated your existing saved search and alert preferences.');
+            return res.redirect(returnTo);
+        }
+
+        if (req.flash) req.flash('success_msg', 'Search saved. We will alert you when new matches are published.');
+        return res.redirect(returnTo);
+    } catch (error) {
+        console.error('Error saving internship search:', error);
+        const message = isSavedSearchDuplicateKeyError(error)
+            ? 'A matching saved search was updated at the same time. Please try again.'
+            : (error.message || 'Unable to save this search. Please try again.');
+        if (req.flash) req.flash('error_msg', message);
+        return res.redirect(returnTo);
+    }
+});
+
+/**
+ * PATCH /candidate/saved-searches/:id
+ * Edits the title and alert preferences. The criteria field is optional so a
+ * settings form cannot accidentally discard a saved filter; API clients may
+ * provide it to update filters after choosing a different result set.
+ */
+router.patch('/candidate/saved-searches/:id', isAuthenticated, authorize('candidate'), async (req, res) => {
+    const returnTo = savedSearchReturnPath(req);
+
+    try {
+        if (!isValidSavedSearchId(req.params.id)) throw new Error('Saved search not found.');
+        const savedSearch = await SavedSearch.findOne({ _id: req.params.id, candidate: req.user._id });
+        if (!savedSearch) throw new Error('Saved search not found.');
+
+        const nextCriteria = Object.prototype.hasOwnProperty.call(req.body || {}, 'criteria')
+            ? parseSavedSearchCriteria(req.body.criteria)
+            : normalizeSavedSearchCriteria(savedSearch.criteria);
+        if (!hasSavedSearchCriteria(nextCriteria)) {
+            throw new Error('Choose at least one filter before saving this search.');
+        }
+
+        const criteriaHash = getSavedSearchCriteriaHash(nextCriteria);
+        const duplicate = await SavedSearch.exists({
+            candidate: req.user._id,
+            criteriaHash,
+            _id: { $ne: savedSearch._id }
+        });
+        if (duplicate) throw new Error('You already have a saved search with those filters.');
+
+        const name = getSavedSearchName(req.body?.name, savedSearch.name);
+        const { frequency, delivery } = getAlertSettings(req.body, savedSearch);
+        const criteriaChanged = criteriaHash !== savedSearch.criteriaHash;
+        const frequencyChanged = frequency !== savedSearch.frequency;
+
+        savedSearch.name = name;
+        savedSearch.criteria = nextCriteria;
+        savedSearch.criteriaHash = criteriaHash;
+        savedSearch.frequency = frequency;
+        savedSearch.delivery = delivery;
+        if (criteriaChanged || frequencyChanged) {
+            const now = new Date();
+            savedSearch.alertStartAt = now;
+            if (frequency === 'daily' || frequency === 'weekly') savedSearch.lastDigestAt = now;
+        }
+        await savedSearch.save();
+
+        if (req.flash) req.flash('success_msg', 'Saved search updated.');
+        return res.redirect(returnTo);
+    } catch (error) {
+        console.error('Error updating saved search:', error);
+        const message = isSavedSearchDuplicateKeyError(error)
+            ? 'You already have a saved search with those filters.'
+            : (error.message || 'Unable to update this saved search.');
+        if (req.flash) req.flash('error_msg', message);
+        return res.redirect(returnTo);
+    }
+});
+
+/**
+ * POST /candidate/saved-searches/:id/pause
+ * Explicitly supports pause and resume without removing a candidate's chosen
+ * filters or their selected alert settings.
+ */
+router.post('/candidate/saved-searches/:id/pause', isAuthenticated, authorize('candidate'), async (req, res) => {
+    const returnTo = savedSearchReturnPath(req);
+
+    try {
+        if (!isValidSavedSearchId(req.params.id)) throw new Error('Saved search not found.');
+        const savedSearch = await SavedSearch.findOne({ _id: req.params.id, candidate: req.user._id });
+        if (!savedSearch) throw new Error('Saved search not found.');
+
+        const wasPaused = savedSearch.isPaused;
+        savedSearch.isPaused = readCheckbox(req.body?.isPaused);
+        if (wasPaused && !savedSearch.isPaused) {
+            // Resuming begins a fresh alert window. Candidates should not get
+            // a backlog of internships published while the search was paused.
+            const now = new Date();
+            savedSearch.alertStartAt = now;
+            if (savedSearch.frequency === 'daily' || savedSearch.frequency === 'weekly') {
+                savedSearch.lastDigestAt = now;
+            }
+        }
+        await savedSearch.save();
+        if (req.flash) req.flash('success_msg', savedSearch.isPaused ? 'Saved-search alerts paused.' : 'Saved-search alerts resumed.');
+        return res.redirect(returnTo);
+    } catch (error) {
+        console.error('Error pausing saved search:', error);
+        if (req.flash) req.flash('error_msg', error.message || 'Unable to change the saved-search alert state.');
+        return res.redirect(returnTo);
+    }
+});
+
+/**
+ * DELETE /candidate/saved-searches/:id
+ * Candidate ownership is included in the deletion query to prevent IDOR.
+ */
+router.delete('/candidate/saved-searches/:id', isAuthenticated, authorize('candidate'), async (req, res) => {
+    const returnTo = savedSearchReturnPath(req);
+
+    try {
+        if (!isValidSavedSearchId(req.params.id)) throw new Error('Saved search not found.');
+        const deleted = await SavedSearch.findOneAndDelete({ _id: req.params.id, candidate: req.user._id });
+        if (!deleted) throw new Error('Saved search not found.');
+        if (req.flash) req.flash('success_msg', 'Saved search deleted.');
+        return res.redirect(returnTo);
+    } catch (error) {
+        console.error('Error deleting saved search:', error);
+        if (req.flash) req.flash('error_msg', error.message || 'Unable to delete this saved search.');
+        return res.redirect(returnTo);
+    }
+});
+
+/**
+ * GET /candidate/saved-searches/:id/edit
+ * Gives candidates a full filter editor instead of requiring them to recreate
+ * a search when their target skill, city, stipend, or duration changes.
+ */
+router.get('/candidate/saved-searches/:id/edit', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        if (!isValidSavedSearchId(req.params.id)) throw new Error('Saved search not found.');
+        const savedSearch = await SavedSearch.findOne({ _id: req.params.id, candidate: req.user._id }).lean();
+        if (!savedSearch) throw new Error('Saved search not found.');
+
+        res.render('candidate/saved-search-edit', {
+            currentUser: req.user,
+            savedSearch
+        });
+    } catch (error) {
+        console.error('Error loading saved-search editor:', error);
+        if (req.flash) req.flash('error_msg', error.message || 'Unable to edit this saved search.');
+        res.redirect('/candidate/saved-searches');
+    }
+});
+
+/**
+ * GET /candidate/saved-searches/:id/results
+ * Uses a server-owned criterion record rather than accepting a caller-provided
+ * filter object, then returns to the standard searchable opportunities page.
+ */
+router.get('/candidate/saved-searches/:id/results', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        if (!isValidSavedSearchId(req.params.id)) throw new Error('Saved search not found.');
+        const savedSearch = await SavedSearch.findOne({ _id: req.params.id, candidate: req.user._id }).lean();
+        if (!savedSearch) throw new Error('Saved search not found.');
+        return res.redirect(buildSavedSearchResultsUrl(savedSearch.criteria));
+    } catch (error) {
+        console.error('Error opening saved-search results:', error);
+        if (req.flash) req.flash('error_msg', error.message || 'Unable to open this saved search.');
+        return res.redirect('/candidate/saved-searches');
     }
 });
 
@@ -120,6 +394,14 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
         const applications = await Application.find(query)
             .populate('internship')
             .sort(sortObj);
+
+        const stats = {
+            total: applications.length,
+            submitted: applications.filter(a => a.status === 'Submitted').length,
+            underReview: applications.filter(a => a.status === 'Under Review').length,
+            shortlisted: applications.filter(a => a.status === 'Shortlisted').length,
+            rejected: applications.filter(a => a.status === 'Rejected').length
+        };
 
         res.render('candidate/candidate-tracker', {
             candidate,

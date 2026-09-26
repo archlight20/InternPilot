@@ -24,6 +24,7 @@ const userSchema = new mongoose.Schema({
     age: { type: Number },
     familyIncome: { type: Number },
     institution: { type: String },
+    qualification: { type: String, trim: true, default: '' },
     enrollmentStatus: { type: String, trim: true, default: '' },
     employmentStatus: { type: String, trim: true, default: '' },
     // Keep this legacy string list as a compatibility mirror while callers

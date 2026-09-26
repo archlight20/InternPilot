@@ -887,9 +887,12 @@ const handleResume = async (req, res) => {
         const internship = await Internship.findOne({ _id: req.params.id, ...companyInternshipQuery(req.company) });
         if (!internship) return res.status(404).send('Internship not found or unauthorized.');
 
+        const becamePublished = internship.status !== 'published' || internship.isPaused === true;
         internship.status = 'published';
         internship.isPaused = false;
         await internship.save();
+
+        if (becamePublished) notifyPublishedInternship(internship);
 
         logRecruiterActivity(req, {
             action: 'RESUME_LISTING',
@@ -935,6 +938,8 @@ const handleTogglePause = async (req, res) => {
             internship.isPaused = false;
         }
         await internship.save();
+
+        if (!willPause) notifyPublishedInternship(internship);
 
         logRecruiterActivity(req, {
             action: willPause ? 'PAUSE_LISTING' : 'RESUME_LISTING',
@@ -1108,6 +1113,7 @@ router.get('/company/applications/:id/candidate', isAuthenticated, requireCompan
             application,
             candidate: application.candidate,
             internship,
+            permissions: req.companyPermissions,
             skillProfiles: buildSkillProfiles(application.candidate)
         });
     } catch (error) {
