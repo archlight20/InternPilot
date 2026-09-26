@@ -1,0 +1,117 @@
+<%
+    const kitQuestions = Array.isArray(applicationQuestions)
+        ? applicationQuestions.filter(question => question && question.prompt)
+        : [];
+%>
+
+<section data-application-question-builder class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
+    <input type="hidden" name="applicationQuestionsConfigured" value="1">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <i class="ph-bold ph-list-checks text-indigo-600" aria-hidden="true"></i>
+                Application questions
+            </h3>
+            <p class="mt-1 text-[11px] leading-relaxed text-slate-600">Ask up to 10 focused questions. Candidates answer required questions in their Application Kit before submitting.</p>
+        </div>
+        <button type="button" data-question-add
+            class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100">
+            <i class="ph-bold ph-plus" aria-hidden="true"></i>
+            Add question
+        </button>
+    </div>
+
+    <div data-question-list class="space-y-2">
+        <% kitQuestions.forEach((question, index) => { %>
+            <div data-question-row class="rounded-lg border border-indigo-100 bg-white p-3 space-y-2">
+                <div class="flex items-start gap-2">
+                    <span data-question-number class="mt-2 text-[11px] font-bold text-indigo-500"><%= index + 1 %>.</span>
+                    <label class="sr-only" for="application-question-<%= index %>">Application question <%= index + 1 %></label>
+                    <textarea id="application-question-<%= index %>" data-question-prompt name="applicationQuestions" rows="2" maxlength="500"
+                        placeholder="e.g. Why are you interested in this role?"
+                        class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"><%= question.prompt %></textarea>
+                    <button type="button" data-question-remove class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600" aria-label="Remove this question">
+                        <i class="ph-bold ph-trash" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <label class="ml-6 inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                    <input type="checkbox" data-question-required name="requiredQuestionIndexes" value="<%= index %>" <%= question.required ? 'checked' : '' %>
+                        class="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                    Required answer
+                </label>
+            </div>
+        <% }) %>
+    </div>
+
+    <p data-question-empty class="<%= kitQuestions.length ? 'hidden' : '' %> rounded-lg border border-dashed border-indigo-200 bg-white/70 px-3 py-3 text-center text-[11px] text-slate-500">No custom questions yet. Leaving this blank keeps the existing one-click application flow.</p>
+</section>
+
+<script>
+    (() => {
+        document.querySelectorAll('[data-application-question-builder]').forEach(builder => {
+            const list = builder.querySelector('[data-question-list]');
+            const addButton = builder.querySelector('[data-question-add]');
+            const emptyState = builder.querySelector('[data-question-empty]');
+            const maxQuestions = 10;
+
+            const refresh = () => {
+                const rows = Array.from(list.querySelectorAll('[data-question-row]'));
+                rows.forEach((row, index) => {
+                    const number = row.querySelector('[data-question-number]');
+                    const prompt = row.querySelector('[data-question-prompt]');
+                    const required = row.querySelector('[data-question-required]');
+                    if (number) number.textContent = `${index + 1}.`;
+                    if (prompt) {
+                        prompt.id = `application-question-${index}`;
+                        prompt.previousElementSibling?.setAttribute('for', prompt.id);
+                    }
+                    if (required) required.value = String(index);
+                });
+                if (emptyState) emptyState.classList.toggle('hidden', rows.length > 0);
+                if (addButton) addButton.disabled = rows.length >= maxQuestions;
+                if (addButton) addButton.classList.toggle('opacity-50', rows.length >= maxQuestions);
+            };
+
+            const addRow = (question = {}) => {
+                if (list.querySelectorAll('[data-question-row]').length >= maxQuestions) return;
+                const row = document.createElement('div');
+                row.setAttribute('data-question-row', '');
+                row.className = 'rounded-lg border border-indigo-100 bg-white p-3 space-y-2';
+                row.innerHTML = `
+                    <div class="flex items-start gap-2">
+                        <span data-question-number class="mt-2 text-[11px] font-bold text-indigo-500"></span>
+                        <label class="sr-only">Application question</label>
+                        <textarea data-question-prompt name="applicationQuestions" rows="2" maxlength="500" placeholder="e.g. Why are you interested in this role?" class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"></textarea>
+                        <button type="button" data-question-remove class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600" aria-label="Remove this question"><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
+                    </div>
+                    <label class="ml-6 inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                        <input type="checkbox" data-question-required name="requiredQuestionIndexes" class="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                        Required answer
+                    </label>`;
+                list.appendChild(row);
+                const prompt = row.querySelector('[data-question-prompt]');
+                const required = row.querySelector('[data-question-required]');
+                if (prompt) prompt.value = question.prompt || '';
+                if (required) required.checked = Boolean(question.required);
+                refresh();
+                if (!question.suppressFocus) prompt?.focus();
+            };
+
+            addButton?.addEventListener('click', addRow);
+            list.addEventListener('click', event => {
+                const removeButton = event.target.closest('[data-question-remove]');
+                if (!removeButton) return;
+                removeButton.closest('[data-question-row]')?.remove();
+                refresh();
+            });
+            builder.__setApplicationQuestions = questions => {
+                list.innerHTML = '';
+                (Array.isArray(questions) ? questions : []).slice(0, maxQuestions).forEach(question => {
+                    addRow({ ...question, suppressFocus: true });
+                });
+                refresh();
+            };
+            refresh();
+        });
+    })();
+</script>

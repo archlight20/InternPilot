@@ -1,0 +1,129 @@
+<%
+    const submittedKit = (typeof applicationKit !== 'undefined' && applicationKit) ? applicationKit : null;
+    const kitProjects = submittedKit && Array.isArray(submittedKit.projects) ? submittedKit.projects : [];
+    const kitCertifications = submittedKit && Array.isArray(submittedKit.certifications) ? submittedKit.certifications : [];
+    const kitSkills = submittedKit && Array.isArray(submittedKit.skills) ? submittedKit.skills : [];
+    const kitAnswers = submittedKit && Array.isArray(submittedKit.answers) ? submittedKit.answers : [];
+    const kitProfile = submittedKit && submittedKit.candidateProfile ? submittedKit.candidateProfile : {};
+    const safeKitFileUrl = value => {
+        const raw = typeof value === 'string' ? value.trim() : '';
+        return /^\/uploads\/(?:resumes|documents)\//.test(raw) ? raw : sanitizeHttpUrl(raw).url;
+    };
+    const kitResumeUrl = submittedKit && submittedKit.resume ? safeKitFileUrl(submittedKit.resume.fileUrl) : '';
+    const kitDate = submittedKit && submittedKit.submittedAt ? new Date(submittedKit.submittedAt) : null;
+%>
+
+<section id="submitted-application-kit" data-submitted-application-kit class="rounded-2xl border border-indigo-200 bg-white shadow-sm overflow-hidden">
+    <div class="border-b border-indigo-100 bg-indigo-50/70 px-5 py-4 sm:px-6">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-white text-indigo-700">
+                    <i class="ph-bold ph-briefcase" aria-hidden="true"></i>
+                </span>
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Submitted Application Kit</h2>
+                    <p class="text-xs text-slate-600">This is the preserved record of material selected when the application was submitted.</p>
+                </div>
+            </div>
+            <% if (kitDate && !Number.isNaN(kitDate.getTime())) { %>
+                <time datetime="<%= kitDate.toISOString() %>" class="text-[11px] font-semibold text-indigo-700">Submitted <%= kitDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) %></time>
+            <% } %>
+        </div>
+    </div>
+
+    <% if (!submittedKit) { %>
+        <div class="px-5 py-5 text-sm text-slate-600 sm:px-6">
+            <p class="font-semibold text-slate-800">Standard application</p>
+            <p class="mt-1">This application was submitted before Application Kit snapshots were available, so no tailored materials were recorded.</p>
+        </div>
+    <% } else { %>
+        <div class="grid grid-cols-1 gap-5 p-5 sm:p-6 lg:grid-cols-2">
+            <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Profile at submission</h3>
+                <dl class="mt-3 space-y-2 text-sm">
+                    <div><dt class="text-[11px] font-semibold text-slate-400">Candidate</dt><dd class="font-semibold text-slate-800"><%= kitProfile.name || 'Not recorded' %></dd></div>
+                    <div><dt class="text-[11px] font-semibold text-slate-400">Email</dt><dd class="text-slate-700"><%= kitProfile.email || 'Not recorded' %></dd></div>
+                    <div><dt class="text-[11px] font-semibold text-slate-400">Education</dt><dd class="text-slate-700"><%= (kitProfile.education && [kitProfile.education.qualification, kitProfile.education.institutionName].filter(Boolean).join(' · ')) || 'Not recorded' %></dd></div>
+                    <div><dt class="text-[11px] font-semibold text-slate-400">Location</dt><dd class="text-slate-700"><%= (kitProfile.location && [kitProfile.location.district, kitProfile.location.state].filter(Boolean).join(', ')) || 'Not recorded' %></dd></div>
+                </dl>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Selected resume</h3>
+                <% if (submittedKit.resume && submittedKit.resume.label) { %>
+                    <div class="mt-3 flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-slate-800"><%= submittedKit.resume.label %></p>
+                            <p class="truncate text-xs text-slate-500"><%= submittedKit.resume.fileName || 'Resume file' %></p>
+                        </div>
+                        <% if (kitResumeUrl) { %>
+                            <a href="<%= kitResumeUrl %>" target="_blank" rel="noopener noreferrer" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-50">
+                                View resume <i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i>
+                            </a>
+                        <% } %>
+                    </div>
+                <% } else { %>
+                    <p class="mt-3 text-sm text-slate-500">No resume was selected.</p>
+                <% } %>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 p-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Highlighted skills</h3>
+                <% if (kitSkills.length) { %>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <% kitSkills.forEach(skill => { %>
+                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700"><%= skill.name %><span class="rounded bg-white px-1.5 py-0.5 text-[10px]"><%= skill.proficiency || 'Intermediate' %></span></span>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <p class="mt-3 text-sm text-slate-500">No skills were highlighted.</p>
+                <% } %>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 p-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Company questions</h3>
+                <% if (kitAnswers.length) { %>
+                    <dl class="mt-3 space-y-3">
+                        <% kitAnswers.forEach(answer => { %>
+                            <div>
+                                <dt class="text-sm font-semibold text-slate-800"><%= answer.prompt %><% if (answer.required) { %><span class="ml-1 text-rose-600" aria-label="Required">*</span><% } %></dt>
+                                <dd class="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600"><%= answer.answer || 'No response provided.' %></dd>
+                            </div>
+                        <% }) %>
+                    </dl>
+                <% } else { %>
+                    <p class="mt-3 text-sm text-slate-500">No listing-specific questions were included.</p>
+                <% } %>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 p-4 lg:col-span-2">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Selected projects and certifications</h3>
+                <% if (!kitProjects.length && !kitCertifications.length) { %>
+                    <p class="mt-3 text-sm text-slate-500">No projects or certifications were selected.</p>
+                <% } else { %>
+                    <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <% kitProjects.forEach(project => { %>
+                            <% const projectLink = sanitizeHttpUrl(project.link).url; const projectFile = safeKitFileUrl(project.fileUrl); %>
+                            <article class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Project</span>
+                                <h4 class="mt-1 text-sm font-semibold text-slate-800"><%= project.title || 'Untitled project' %></h4>
+                                <% if (project.description) { %><p class="mt-1 text-xs leading-relaxed text-slate-600"><%= project.description %></p><% } %>
+                                <% if (project.techStack && project.techStack.length) { %><p class="mt-2 text-[11px] font-medium text-slate-500"><%= project.techStack.join(' · ') %></p><% } %>
+                                <div class="mt-2 flex flex-wrap gap-3 text-xs font-semibold"><% if (projectLink) { %><a href="<%= projectLink %>" target="_blank" rel="noopener noreferrer" class="text-indigo-700 hover:underline">Project link</a><% } %><% if (projectFile) { %><a href="<%= projectFile %>" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline"><%= project.fileName || 'Attachment' %></a><% } %></div>
+                            </article>
+                        <% }) %>
+                        <% kitCertifications.forEach(certification => { %>
+                            <% const credentialLink = sanitizeHttpUrl(certification.link).url; const certificateFile = safeKitFileUrl(certification.fileUrl); %>
+                            <article class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Certification</span>
+                                <h4 class="mt-1 text-sm font-semibold text-slate-800"><%= certification.name || 'Untitled certification' %></h4>
+                                <p class="mt-1 text-xs text-slate-600"><%= certification.issuer || 'Issuer not recorded' %></p>
+                                <div class="mt-2 flex flex-wrap gap-3 text-xs font-semibold"><% if (credentialLink) { %><a href="<%= credentialLink %>" target="_blank" rel="noopener noreferrer" class="text-indigo-700 hover:underline">Credential link</a><% } %><% if (certificateFile) { %><a href="<%= certificateFile %>" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline"><%= certification.fileName || 'Certificate file' %></a><% } %></div>
+                            </article>
+                        <% }) %>
+                    </div>
+                <% } %>
+            </section>
+        </div>
+    <% } %>
+</section>

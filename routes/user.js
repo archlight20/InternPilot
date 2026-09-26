@@ -76,6 +76,26 @@ function escapeRegExp(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function resumeVersionPayload({ label, fileUrl, fileName, createdAt = new Date() }) {
+    const normalizedLabel = typeof label === 'string' ? label.trim().slice(0, 100) : '';
+    const normalizedFileName = typeof fileName === 'string' ? fileName.trim().slice(0, 180) : '';
+    return {
+        label: normalizedLabel || normalizedFileName || 'Resume version',
+        fileUrl,
+        fileName: normalizedFileName,
+        isDefault: true,
+        createdAt
+    };
+}
+
+async function storeResumeVersion(userId, versionPayload) {
+    const profile = await User.findById(userId).select('resumeVersions');
+    if (!profile) throw new Error('Candidate profile not found.');
+    profile.resumeVersions.forEach(version => { version.isDefault = false; });
+    profile.resumeVersions.push(versionPayload);
+    await profile.save();
+}
+
 async function analyzeResumeQuality(text, customClient = null) {
     if (!text || !text.trim()) {
         console.warn('Resume text is empty; skipping AI quality feedback generation.');
@@ -362,6 +382,7 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
         };
 
         const resumeOriginalName = req.file.originalname;
+        const resumeVersionLabel = req.body.resumeLabel || '';
         const resumeUploadedAt = new Date();
         let resumeUrl = '';
 
@@ -450,6 +471,7 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
                 autoMerged,
                 resumeUrl,
                 resumeOriginalName,
+                resumeVersionLabel,
                 resumeQuality,
                 showConflictModal: true
             });
@@ -481,6 +503,12 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
         }
 
         await User.findByIdAndUpdate(userId, updateDoc);
+        await storeResumeVersion(userId, resumeVersionPayload({
+            label: resumeVersionLabel,
+            fileUrl: resumeUrl,
+            fileName: resumeOriginalName,
+            createdAt: resumeUploadedAt
+        }));
         await Recommendation.deleteMany({ candidate: userId });
         if (req.flash) req.flash('success_msg', 'Resume uploaded successfully! Your profile details have been synced.');
 
@@ -527,6 +555,7 @@ router.post('/candidate/profile/confirm-update', isAuthenticated, authorize('can
 
         const resumeUrl = req.body.resumeUrl || '';
         const resumeOriginalName = req.body.resumeOriginalName || '';
+        const resumeVersionLabel = req.body.resumeVersionLabel || '';
 
         // ── Build the final update document ───────────────────────
         const updateDoc = { $set: {} };
@@ -592,6 +621,14 @@ router.post('/candidate/profile/confirm-update', isAuthenticated, authorize('can
         }
 
         await User.findByIdAndUpdate(userId, updateDoc, { runValidators: false });
+        if (resumeUrl) {
+            await storeResumeVersion(userId, resumeVersionPayload({
+                label: resumeVersionLabel,
+                fileUrl: resumeUrl,
+                fileName: resumeOriginalName,
+                createdAt: updateDoc.$set.resumeUploadedAt
+            }));
+        }
         await Recommendation.deleteMany({ candidate: userId });
         if (req.flash) req.flash('success_msg', 'Resume uploaded successfully! Your profile has been updated with your selected choices.');
         res.redirect('/candidate/profile');
@@ -620,6 +657,68 @@ router.post('/candidate/resume/delete', isAuthenticated, authorize('candidate'),
         console.error('Error removing resume:', error);
         if (req.flash) req.flash('error_msg', 'Failed to remove resume. Please try again.');
         res.redirect('/candidate/profile');
+    }
+});
+
+// Select a historical resume version as the candidate's active/default one.
+// Application snapshots keep their own file URL, so this never changes a
+// previously submitted Application Kit.
+router.post('/candidate/profile/resume-versions/:versionId/default', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const user = await User.findById(userId);
+        const selected = user && user.resumeVersions && user.resumeVersions.id(req.params.versionId);
+        if (!selected) {
+            if (req.flash) req.flash('error_msg', 'Resume version not found.');
+            return res.redirect('/candidate/profile');
+        }
+
+        user.resumeVersions.forEach(version => { version.isDefault = String(version._id) === String(selected._id); });
+        user.resume = selected.fileUrl;
+        user.resumeOriginalName = selected.fileName || selected.label;
+        user.resumeUploadedAt = selected.createdAt || new Date();
+        await user.save();
+
+        if (req.flash) req.flash('success_msg', 'Default resume version updated.');
+        return res.redirect('/candidate/profile');
+    } catch (error) {
+        console.error('Error selecting resume version:', error);
+        if (req.flash) req.flash('error_msg', 'Unable to select that resume version.');
+        return res.redirect('/candidate/profile');
+    }
+});
+
+// Remove a stored resume version. If the removed version was current, a
+// remaining version becomes the default; immutable application snapshots are
+// deliberately left intact.
+router.post('/candidate/profile/resume-versions/:versionId/delete', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const user = await User.findById(userId);
+        const version = user && user.resumeVersions && user.resumeVersions.id(req.params.versionId);
+        if (!version) {
+            if (req.flash) req.flash('error_msg', 'Resume version not found.');
+            return res.redirect('/candidate/profile');
+        }
+
+        const wasDefault = Boolean(version.isDefault) || String(user.resume || '') === String(version.fileUrl || '');
+        user.resumeVersions.pull(req.params.versionId);
+
+        if (wasDefault) {
+            const replacement = user.resumeVersions[0];
+            user.resume = replacement ? replacement.fileUrl : '';
+            user.resumeOriginalName = replacement ? (replacement.fileName || replacement.label) : '';
+            user.resumeUploadedAt = replacement ? (replacement.createdAt || new Date()) : null;
+            user.resumeVersions.forEach((entry, index) => { entry.isDefault = index === 0; });
+        }
+        await user.save();
+
+        if (req.flash) req.flash('success_msg', 'Resume version removed.');
+        return res.redirect('/candidate/profile');
+    } catch (error) {
+        console.error('Error removing resume version:', error);
+        if (req.flash) req.flash('error_msg', 'Unable to remove that resume version.');
+        return res.redirect('/candidate/profile');
     }
 });
 
@@ -879,6 +978,7 @@ router.get('/candidate/applications', isAuthenticated, authorize('candidate'), a
     try {
         const userId = req.user._id || req.user.id;
         const candidate = await User.findById(userId);
+
         const searchQuery = (req.query.search || '').trim();
         const statusFilter = (req.query.status || 'all').trim();
         const sortOrder = (req.query.sort || 'applied_desc').trim();
@@ -898,19 +998,18 @@ router.get('/candidate/applications', isAuthenticated, authorize('candidate'), a
             if (statusFilter.toLowerCase() === 'submitted') {
                 query.status = { $in: ['Submitted', 'pending'] };
             } else {
-                query.status = new RegExp('^' + statusFilter.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&') + '$', 'i');
+                query.status = new RegExp('^' + statusFilter.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i');
             }
         }
 
         if (searchQuery) {
-            const Internship = require('../models/Internship');
-            const escapeRegex = (text) => text.replace(/[-[\]{}()*+?.,\\\\^$|#\\s]/g, '\\\\$&');
+            const escapeRegex = (text) => text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
             const regex = new RegExp(escapeRegex(searchQuery), 'gi');
-            
+
             const matchingInternships = await Internship.find({
                 $or: [{ title: regex }, { companyName: regex }, { company: regex }]
             }).select('_id');
-            
+
             const internshipIds = matchingInternships.map(i => i._id);
             query.internship = { $in: internshipIds };
         }
@@ -935,6 +1034,7 @@ router.get('/candidate/applications', isAuthenticated, authorize('candidate'), a
             searchQuery,
             statusFilter,
             sortOrder,
+            sanitizeHttpUrl,
             formatRelativeTime,
             formatLocalizedDateTime
         });

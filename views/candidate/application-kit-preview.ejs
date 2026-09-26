@@ -1,0 +1,38 @@
+<% layout('layouts/boilerplate') %>
+<%
+    const kit = applicationKit || {};
+    const previewResumeRaw = kit.resume && typeof kit.resume.fileUrl === 'string' ? kit.resume.fileUrl.trim() : '';
+    const previewResumeUrl = /^\/uploads\/(?:resumes|documents)\//.test(previewResumeRaw)
+        ? previewResumeRaw
+        : sanitizeHttpUrl(previewResumeRaw).url;
+    const previewProjects = Array.isArray(kit.projects) ? kit.projects : [];
+    const previewCertifications = Array.isArray(kit.certifications) ? kit.certifications : [];
+    const previewSkills = Array.isArray(kit.skills) ? kit.skills : [];
+    const previewAnswers = Array.isArray(kit.answers) ? kit.answers : [];
+%>
+
+<main class="mx-auto max-w-4xl space-y-6 px-3 py-6 sm:px-4">
+    <header class="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-5 sm:p-6">
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">Final review</p>
+        <h1 class="mt-1 text-2xl font-bold text-slate-900">Ready to submit to <%= internship.companyName || 'the company' %>?</h1>
+        <p class="mt-2 text-sm text-slate-600">Review the exact material below. The server will rebuild this snapshot from your profile when you submit, so later profile edits will not change it.</p>
+    </header>
+
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 space-y-5">
+        <div class="flex items-center justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Opportunity</p><h2 class="mt-1 text-lg font-bold text-slate-900"><%= internship.title %></h2></div><a href="/internships/<%= internship._id %>/application-kit" class="text-xs font-semibold text-indigo-700 hover:underline">Edit selections</a></div>
+        <div class="grid gap-4 sm:grid-cols-2"><div class="rounded-xl border border-slate-200 p-4"><p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Resume</p><p class="mt-2 text-sm font-semibold text-slate-800"><%= kit.resume && kit.resume.label ? kit.resume.label : 'No resume selected' %></p><% if (previewResumeUrl) { %><a href="<%= previewResumeUrl %>" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-xs font-semibold text-indigo-700 hover:underline">View selected resume</a><% } %></div><div class="rounded-xl border border-slate-200 p-4"><p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Materials selected</p><p class="mt-2 text-sm text-slate-700"><%= previewProjects.length %> project<%= previewProjects.length === 1 ? '' : 's' %> · <%= previewCertifications.length %> certification<%= previewCertifications.length === 1 ? '' : 's' %></p><p class="mt-1 text-xs text-slate-500"><%= previewSkills.length %> highlighted skill<%= previewSkills.length === 1 ? '' : 's' %></p></div></div>
+        <% if (previewSkills.length) { %><div><p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Highlighted skills</p><div class="mt-2 flex flex-wrap gap-2"><% previewSkills.forEach(skill => { %><span class="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700"><%= skill.name %> · <%= skill.proficiency %></span><% }) %></div></div><% } %>
+        <% if (previewProjects.length || previewCertifications.length) { %><div class="grid gap-3 sm:grid-cols-2"><% previewProjects.forEach(project => { %><div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Project</span><p class="mt-1 text-sm font-semibold text-slate-800"><%= project.title %></p></div><% }) %><% previewCertifications.forEach(certification => { %><div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Certification</span><p class="mt-1 text-sm font-semibold text-slate-800"><%= certification.name %></p><p class="mt-0.5 text-xs text-slate-500"><%= certification.issuer || 'Issuer not recorded' %></p></div><% }) %></div><% } %>
+        <% if (previewAnswers.length) { %><div class="space-y-4 border-t border-slate-100 pt-5"><p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Company questions</p><% previewAnswers.forEach(answer => { %><div><p class="text-sm font-semibold text-slate-800"><%= answer.prompt %></p><p class="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600"><%= answer.answer || 'No response provided.' %></p></div><% }) %></div><% } %>
+    </section>
+
+    <form action="/internships/<%= internship._id %>/application-kit/submit" method="POST" class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <% if (kit.resume && kit.resume.sourceId) { %><input type="hidden" name="resumeVersionId" value="<%= kit.resume.sourceId %>"><% } %>
+        <% previewProjects.forEach(project => { %><input type="hidden" name="projectIds" value="<%= project.sourceId %>"><% }) %>
+        <% previewCertifications.forEach(certification => { %><input type="hidden" name="certificationIds" value="<%= certification.sourceId %>"><% }) %>
+        <% previewSkills.forEach(skill => { %><input type="hidden" name="skillNames" value="<%= skill.name %>"><% }) %>
+        <% previewAnswers.forEach(answer => { %><input type="hidden" name="answers[<%= answer.questionId %>]" value="<%= answer.answer %>"><% }) %>
+        <a href="/internships/<%= internship._id %>/application-kit" class="inline-flex justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to edit</a>
+        <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"><i class="ph-bold ph-paper-plane-tilt" aria-hidden="true"></i> Submit application</button>
+    </form>
+</main>

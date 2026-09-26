@@ -58,6 +58,14 @@ const internshipSchema = new mongoose.Schema({
     description: { type: String, default: '' },
     responsibilities: { type: [String], default: [] },
     eligibilityCriteria: { type: [String], default: [] },
+    // Each question has its own stable subdocument ID. Application kits copy
+    // that ID plus the prompt, which keeps historical answers meaningful even
+    // if the listing is later edited or reordered.
+    applicationQuestions: [{
+        prompt: { type: String, required: true, trim: true, maxlength: 500 },
+        required: { type: Boolean, default: false },
+        maxLength: { type: Number, default: 2000, min: 1, max: 2000 }
+    }],
 
     embedding: [Number],
     postedBy: {

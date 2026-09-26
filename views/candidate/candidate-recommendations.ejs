@@ -193,12 +193,16 @@
                                     Applications Closed
                                 </button>
                             <% } else if (eligibility && eligibility.isEligible) { %>
-                                <form action="/internships/<%= rec.role._id %>/apply" method="POST" data-loading-text="Applying...">
-                                    <button type="submit"
-                                        class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-colors shadow-sm shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer">
-                                        <i class="ph-bold ph-paper-plane-tilt"></i> Apply Now
-                                    </button>
-                                </form>
+                                <% const hasListingQuestions = Array.isArray(rec.role.applicationQuestions) && rec.role.applicationQuestions.some(question => question && question.prompt); %>
+                                <a href="/internships/<%= rec.role._id %>/application-kit"
+                                    class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-colors shadow-sm shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer">
+                                    <i class="ph-bold ph-briefcase"></i> <%= hasListingQuestions ? 'Prepare Application Kit' : 'Tailor Application' %>
+                                </a>
+                                <% if (!hasListingQuestions) { %>
+                                    <form action="/internships/<%= rec.role._id %>/apply" method="POST" data-loading-text="Applying..." class="mt-2">
+                                        <button type="submit" class="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-sm rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"><i class="ph-bold ph-paper-plane-tilt"></i> Quick Apply</button>
+                                    </form>
+                                <% } %>
                             <% } else { %>
                                 <button disabled
                                     class="w-full py-2.5 px-4 bg-slate-100 text-slate-400 font-medium text-sm rounded-xl cursor-not-allowed border border-slate-200">

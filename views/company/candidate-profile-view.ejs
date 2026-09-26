@@ -9,6 +9,13 @@
 <% const safeMeetingLink = application && application.interview
     ? sanitizeHttpUrl(application.interview.meetingLink).url
     : ''; %>
+<% const safeStoredFileUrl = value => {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    return /^\/uploads\/(?:resumes|documents)\//.test(raw) ? raw : sanitizeHttpUrl(raw).url;
+}; %>
+<% const submittedResumeUrl = application && application.applicationKit && application.applicationKit.resume
+    ? safeStoredFileUrl(application.applicationKit.resume.fileUrl)
+    : ''; %>
 
 <div class="max-w-5xl mx-auto space-y-6">
 
@@ -56,11 +63,11 @@
         </div>
 
         <div class="flex items-center gap-3 flex-shrink-0">
-            <% const resumeUrl = candidate.resume || candidate.resumeUrl; %>
+            <% const resumeUrl = submittedResumeUrl || safeStoredFileUrl(candidate.resume || candidate.resumeUrl); %>
             <% if (resumeUrl) { %>
                 <a href="<%= resumeUrl %>" target="_blank"
                     class="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
-                    <i class="ph-bold ph-file-pdf text-sm"></i> View Resume
+                    <i class="ph-bold ph-file-pdf text-sm"></i> <%= submittedResumeUrl ? 'View Submitted Resume' : 'View Resume' %>
                 </a>
             <% } else { %>
                 <span
@@ -272,6 +279,8 @@
                     Review PMIS Criteria (Age: 21–24, Family Income &lt; ₹8 Lakhs/year)
                 </div>
             </div>
+
+            <%- include('../partials/application-kit-summary', { applicationKit: application.applicationKit }) %>
 
             <!-- Skills Card -->
             <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">

@@ -29,6 +29,7 @@ const { logRecruiterActivity } = require('../utils/activityLogger');
 const { buildRecruiterOverview } = require('../utils/dashboardStats');
 const { calculateCandidateMatch } = require('../utils/candidateMatcher');
 const { buildSkillProfiles } = require('../utils/skillProfiles');
+const { ApplicationKitValidationError, parseApplicationQuestions } = require('../utils/applicationKit');
 
 function handleLogoUpload(fieldName) {
     return (req, res, next) => {
@@ -85,6 +86,14 @@ const notifyPublishedInternship = (internship) => {
         });
     }
 };
+
+function questionsFromListingRequest(body, fallback = []) {
+    const hasQuestionFields = Object.prototype.hasOwnProperty.call(body || {}, 'applicationQuestions')
+        || Object.prototype.hasOwnProperty.call(body || {}, 'applicationQuestion')
+        || Object.prototype.hasOwnProperty.call(body || {}, 'applicationQuestionsConfigured');
+
+    return hasQuestionFields ? parseApplicationQuestions(body) : fallback;
+}
 
 // Company Profile Management (GET: view/edit form)
 router.get('/company/profile', isAuthenticated, requireCompanyRole(['company', 'recruiter']), async (req, res) => {
@@ -389,6 +398,7 @@ router.post('/company/internships/create', isAuthenticated, requireCompanyPermis
         const stipendNumber = rawStipend ? parseInt(rawStipend.toString().replace(/[^0-9]/g, '')) : (isDraft ? 0 : 5000);
 
         const parseLines = (raw) => (raw ? raw.split('\n').map(s => s.trim()).filter(Boolean) : []);
+        const applicationQuestions = questionsFromListingRequest(req.body, []);
 
         const internship = await Internship.create({
             companyId: req.company._id,
@@ -405,6 +415,7 @@ router.post('/company/internships/create', isAuthenticated, requireCompanyPermis
             description: description || '',
             responsibilities: parseLines(responsibilitiesRaw),
             eligibilityCriteria: parseLines(eligibilityRaw),
+            applicationQuestions,
 
             location: {
                 district: resolvedDistrict,
@@ -435,6 +446,9 @@ router.post('/company/internships/create', isAuthenticated, requireCompanyPermis
         res.redirect('/company/dashboard');
     } catch (error) {
         console.error('Error creating internship:', error);
+        if (error instanceof ApplicationKitValidationError && req.flash) {
+            req.flash('error_msg', error.message);
+        }
         res.redirect('/company/dashboard');
     }
 });
@@ -725,6 +739,7 @@ router.post('/company/internships/edit/:id', isAuthenticated, requireCompanyPerm
         internship.description = description || '';
         internship.responsibilities = parseLines(responsibilitiesRaw);
         internship.eligibilityCriteria = parseLines(eligibilityRaw);
+        internship.applicationQuestions = questionsFromListingRequest(req.body, internship.applicationQuestions || []);
         internship.location = {
             district: district || '',
             state: state || ''
@@ -775,6 +790,10 @@ router.post('/company/internships/edit/:id', isAuthenticated, requireCompanyPerm
         res.redirect('/company/dashboard');
     } catch (error) {
         console.error('Error updating internship:', error);
+        if (error instanceof ApplicationKitValidationError && req.flash) {
+            req.flash('error_msg', error.message);
+            return res.redirect(`/company/internships/edit/${req.params.id}`);
+        }
         res.redirect('/company/dashboard');
     }
 });
