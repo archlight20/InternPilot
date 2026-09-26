@@ -20,10 +20,12 @@ cron.schedule('0 0 * * *', async () => {
         // Exact target day in the future
         const targetDate = new Date();
         targetDate.setDate(targetDate.getDate() + APPROACHING_DEADLINE_DAYS);
-        
-        // Boundary for start of target day and end of target day
-        const startOfTarget = new Date(targetDate.setHours(0, 0, 0, 0));
-        const endOfTarget = new Date(targetDate.setHours(23, 59, 59, 999));
+
+        // Build start/end boundaries from the ISO date string to avoid
+        // mutation hazards — setHours mutates the receiver in-place.
+        const isoDate = targetDate.toISOString().slice(0, 10); // YYYY-MM-DD
+        const startOfTarget = new Date(`${isoDate}T00:00:00.000Z`);
+        const endOfTarget = new Date(`${isoDate}T23:59:59.999Z`);
 
         const upcomingDeadlines = await Internship.find({
             status: 'published',

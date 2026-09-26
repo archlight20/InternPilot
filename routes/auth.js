@@ -76,7 +76,12 @@ router.post('/register', async (req, res) => {
         let selectedRole = 'candidate';
 
         if (role === 'admin') {
-            const SYSTEM_ADMIN_SECRET = process.env.ADMIN_SECRET || 'SUPER_SECRET_ADMIN_KEY_123';
+            const SYSTEM_ADMIN_SECRET = process.env.ADMIN_SECRET;
+
+            if (!SYSTEM_ADMIN_SECRET) {
+                req.flash('error_msg', 'Admin registration is not configured on this server.');
+                return res.redirect('/auth/register');
+            }
 
             if (!adminSecretKey || adminSecretKey !== SYSTEM_ADMIN_SECRET) {
                 req.flash('error_msg', 'Invalid Admin Security Key. Access denied.');

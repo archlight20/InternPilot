@@ -309,6 +309,10 @@ router.post('/:id/delete', isAuthenticated, requireCompanyPermission('internship
     try {
         const internship = await Internship.findOneAndDelete({ _id: req.params.id, ...companyInternshipQuery(req.company) });
         if (!internship) return res.status(404).send('Internship not found');
+
+        // Clean up orphaned applications for this deleted internship
+        await Application.deleteMany({ internship: req.params.id });
+
         if (typeof chatRouter !== 'undefined' && typeof chatRouter.invalidateChatCache === 'function') {
             chatRouter.invalidateChatCache();
         }

@@ -2,7 +2,8 @@ require("dotenv").config();
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    process.exit(1);
+    // Do NOT exit — a single fire-and-forget promise failure (e.g. a
+    // background notification) must never take down the entire server.
 });
 
 process.on('uncaughtException', (error) => {

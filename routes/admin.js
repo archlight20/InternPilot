@@ -36,9 +36,14 @@ router.get('/dashboard', isAuthenticated, authorize('admin'), async (req, res) =
 
 router.post('/approve-company/:id', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
-        await User.findByIdAndUpdate(req.params.id, {
-            'companyDetails.isVerified': true
-        });
+        const result = await User.findOneAndUpdate(
+            { _id: req.params.id, role: 'company' },
+            { 'companyDetails.isVerified': true }
+        );
+        if (!result) {
+            req.flash('error_msg', 'Company not found.');
+            return res.redirect('/admin/dashboard');
+        }
         req.flash('success_msg', 'Company verified successfully.');
         res.redirect('/admin/dashboard');
     } catch (err) {
@@ -50,7 +55,11 @@ router.post('/approve-company/:id', isAuthenticated, authorize('admin'), async (
 
 router.post('/reject-company/:id', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
-        await User.findByIdAndDelete(req.params.id);
+        const result = await User.findOneAndDelete({ _id: req.params.id, role: 'company' });
+        if (!result) {
+            req.flash('error_msg', 'Company not found or already removed.');
+            return res.redirect('/admin/dashboard');
+        }
 
         req.flash('success_msg', 'Company registration rejected.');
         res.redirect('/admin/dashboard');

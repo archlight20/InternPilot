@@ -15,11 +15,16 @@ const internshipSchema = new mongoose.Schema({
         default: 'published',
         index: true,
         set: function (val) {
+            // Guard against infinite recursion: the isPaused setter may
+            // write back to status which re-enters this setter.
+            if (this._settingStatus) return val;
+            this._settingStatus = true;
             if (val === 'paused') {
                 this.isPaused = true;
             } else if (val === 'published' || val === 'draft' || val === 'closed') {
                 this.isPaused = false;
             }
+            this._settingStatus = false;
             return val;
         }
     },
@@ -28,11 +33,16 @@ const internshipSchema = new mongoose.Schema({
         default: false,
         index: true,
         set: function (val) {
+            // Guard against infinite recursion: the status setter may
+            // write back to isPaused which re-enters this setter.
+            if (this._settingPaused) return val;
+            this._settingPaused = true;
             if (val === true && this.status !== 'draft') {
                 this.status = 'paused';
             } else if (val === false && this.status === 'paused') {
                 this.status = 'published';
             }
+            this._settingPaused = false;
             return val;
         }
     },
@@ -70,13 +80,12 @@ const internshipSchema = new mongoose.Schema({
     }
 }, { toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
-// Secondary safety check before saving
+// Secondary safety net: ensure isPaused always agrees with status.
+// Status is the canonical field; isPaused is a convenience mirror.
 internshipSchema.pre('save', function (next) {
     if (this.status === 'paused') {
         this.isPaused = true;
-    } else if (this.isPaused && this.status !== 'draft') {
-        this.status = 'paused';
-    } else if (this.status === 'published' && !this.isPaused) {
+    } else {
         this.isPaused = false;
     }
 

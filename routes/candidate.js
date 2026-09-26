@@ -458,10 +458,21 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
             .populate('internship')
             .sort({ statusUpdatedAt: -1, appliedAt: -1 });
 
+        const stats = {
+            total: applications.length,
+            submitted: applications.filter(a => a.status === 'Submitted').length,
+            underReview: applications.filter(a => a.status === 'Under Review').length,
+            shortlisted: applications.filter(a => a.status === 'Shortlisted').length,
+            rejected: applications.filter(a => a.status === 'Rejected').length
+        };
+
         res.render('candidate/candidate-tracker', {
             candidate,
             currentUser: req.user,
             applications,
+            stats,
+            searchQuery: '',
+            statusFilter: 'all',
             pageTitle: 'My Applications',
             formatRelativeTime,
             formatLocalizedDateTime
@@ -547,10 +558,9 @@ async function handleApplicationWithdrawal(req, res) {
             return res.redirect('/candidate/applications');
         }
 
-        // Soft-delete strategy: update status to 'Withdrawn' with audit details
-        application.status = 'Withdrawn';
-        application.withdrawnAt = new Date();
-        application.withdrawalReason = reason || 'Withdrawn by student';
+        // Use the model's .withdraw() method to ensure statusHistory,
+        // statusUpdatedAt, and interview cancellation are all handled.
+        application.withdraw(reason || undefined);
 
         // Add audit entry in application notes
         if (Array.isArray(application.notes)) {

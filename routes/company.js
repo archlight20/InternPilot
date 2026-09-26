@@ -845,7 +845,7 @@ const handlePause = async (req, res) => {
             targetName: internship.title
         });
 
-        if (typeof chatRouter.invalidateChatCache === 'function') {
+        if (typeof chatRouter !== 'undefined' && typeof chatRouter.invalidateChatCache === 'function') {
             chatRouter.invalidateChatCache();
         }
 
@@ -879,7 +879,7 @@ const handleResume = async (req, res) => {
             targetName: internship.title
         });
 
-        if (typeof chatRouter.invalidateChatCache === 'function') {
+        if (typeof chatRouter !== 'undefined' && typeof chatRouter.invalidateChatCache === 'function') {
             chatRouter.invalidateChatCache();
         }
 
@@ -924,7 +924,7 @@ const handleTogglePause = async (req, res) => {
             targetName: internship.title
         });
 
-        if (typeof chatRouter.invalidateChatCache === 'function') {
+        if (typeof chatRouter !== 'undefined' && typeof chatRouter.invalidateChatCache === 'function') {
             chatRouter.invalidateChatCache();
         }
 
@@ -1128,7 +1128,7 @@ router.post('/company/applications/:id/interview/schedule', isAuthenticated, req
 
         const safeMeetingLink = mode === 'Online' ? sanitizeHttpUrl(meetingLink) : { url: '' };
         if (mode === 'Online' && !safeMeetingLink.url) {
-            if (req.flash) req.flash('error_msg', safeMeetingLink.error || 'Meeting link is required for Online interviews.');
+            if (req.flash) req.flash('error_msg', safeMeetingLink.error || 'A valid meeting link (http:// or https://) is required for Online interviews.');
             return res.redirect(`/company/applications/${req.params.id}/candidate`);
         }
 
