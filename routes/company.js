@@ -480,8 +480,9 @@ router.get('/company/internships/:id/applicants', isAuthenticated, requireCompan
         res.render('company/company-applicants', {
             user: req.user,
             internship,
-            applications,
-            permissions: req.companyPermissions
+            permissions: req.companyPermissions,
+            // Filters run after the match scores above are recalculated.
+            ...buildApplicantViewLocals(applications, req.query, internship._id)
         });
     } catch (error) {
         console.error('Error fetching applicants:', error);

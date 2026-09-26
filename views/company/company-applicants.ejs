@@ -366,18 +366,15 @@
     document.addEventListener('DOMContentLoaded', () => {
         const searchInput = document.getElementById('candidateSearch');
         const proficiencyFilter = document.getElementById('proficiencyFilter');
-        const candidateCards = document.querySelectorAll('.applicant-card');
         const emptyState = document.getElementById('searchEmptyState');
         const proficiencyRank = { Beginner: 0, Intermediate: 1, Advanced: 2 };
 
-        if (!searchInput || !proficiencyFilter) return;
+        if (!searchInput) return;
 
         const applyFilters = () => {
             const searchTerm = searchInput.value.toLowerCase().trim();
-            const minimumLevel = proficiencyFilter.value;
-        searchInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase().trim();
-            // Re-read on each keystroke: the candidate filters swap the cards in place.
+            const minimumLevel = proficiencyFilter ? proficiencyFilter.value : '';
+            // Re-read on every run: the candidate filters swap the cards in place.
             const candidateCards = document.querySelectorAll('.applicant-card');
             let visibleCount = 0;
 
@@ -414,6 +411,6 @@
         };
 
         searchInput.addEventListener('input', applyFilters);
-        proficiencyFilter.addEventListener('change', applyFilters);
+        if (proficiencyFilter) proficiencyFilter.addEventListener('change', applyFilters);
     });
 </script>

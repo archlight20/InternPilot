@@ -59,11 +59,12 @@
             updateSummaries();
         };
 
-        // The page's text search hides cards client-side; run it again on the
-        // new cards so a typed search survives a filter change.
+        // The page's own search and proficiency filters hide cards client-side.
+        // Run them again on the new cards, even with an empty search box, so a
+        // chosen proficiency level still applies after a filter change.
         const reapplySearch = () => {
             const search = document.getElementById('candidateSearch');
-            if (search && search.value) search.dispatchEvent(new Event('input', { bubbles: true }));
+            if (search) search.dispatchEvent(new Event('input', { bubbles: true }));
         };
 
         const setBusy = (busy) => {
