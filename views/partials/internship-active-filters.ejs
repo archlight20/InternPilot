@@ -3,7 +3,7 @@
     const clearUrl = typeof clearFiltersUrl !== 'undefined' && clearFiltersUrl ? clearFiltersUrl : '/internships';
 %>
 <% if (chips.length) { %>
-    <div class="flex flex-wrap items-center gap-2 mb-5" aria-label="Active filters">
+    <div class="flex flex-wrap items-center gap-2" aria-label="Active filters">
         <span class="text-xs font-semibold text-slate-600">
             <span class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 mr-1 rounded-full bg-indigo-600 text-white text-[11px] font-bold tabular-nums"><%= chips.length %></span>
             <%= chips.length === 1 ? 'filter applied' : 'filters applied' %>

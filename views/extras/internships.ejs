@@ -72,24 +72,52 @@
         </div>
     </div>
 
-    <!-- Search, Filter & Sort Bar -->
-    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6 shadow-sm">
-        <%# data-no-loading: results load in place, so the global submit spinner would never clear. %>
-        <form action="/internships" method="GET" class="space-y-3" data-internship-filters data-no-loading>
-            <input type="hidden" name="status" value="<%= filter %>">
-            <input type="hidden" name="limit" value="<%= (query && query.limit && query.limit !== 12) ? query.limit : '' %>">
+    <!-- Main Two-Column Discovery Layout -->
+    <div class="flex flex-col lg:flex-row items-start gap-6 lg:gap-8">
+        <!-- Mobile Drawer Backdrop -->
+        <div id="filterBackdrop" class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs hidden lg:hidden transition-opacity"></div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+        <!-- Left Sidebar: Dedicated Filters (Slide-over drawer on mobile, sticky left column on lg+) -->
+        <aside id="filterSidebar"
+            class="fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] bg-white p-5 overflow-y-auto shadow-2xl transition-transform duration-300 -translate-x-full
+                   lg:translate-x-0 lg:static lg:inset-auto lg:z-10 lg:w-72 xl:w-80 lg:shrink-0 lg:p-5 lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-xs lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]">
+            
+            <%# data-no-loading: results load in place, so the global submit spinner would never clear. %>
+            <form action="/internships" method="GET" class="space-y-4" data-internship-filters data-no-loading>
+                <input type="hidden" name="status" value="<%= filter %>">
+                <input type="hidden" name="limit" value="<%= (query && query.limit && query.limit !== 12) ? query.limit : '' %>">
+
+                <!-- Sidebar Header -->
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <i class="ph-bold ph-faders text-indigo-600 text-base"></i>
+                        <h3 class="text-sm font-bold text-slate-900">Filters</h3>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="clear-filters-btn"
+                            class="text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer">
+                            Reset All
+                        </button>
+                        <button type="button" id="closeMobileFiltersBtn" class="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer" aria-label="Close filters">
+                            <i class="ph-bold ph-x text-base"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Search Input -->
-                <div class="lg:col-span-4 relative">
-                    <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
-                    <input type="text" name="search" value="<%= query ? (query.search || '') : '' %>" placeholder="Search title, company, skills..."
-                        class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors" />
+                <div class="space-y-1.5">
+                    <label for="filterSearchInput" class="block text-xs font-bold text-slate-700">Keywords</label>
+                    <div class="relative">
+                        <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                        <input type="text" id="filterSearchInput" name="search" value="<%= query ? (query.search || '') : '' %>" placeholder="Title, company, skills..."
+                            class="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors" />
+                    </div>
                 </div>
 
                 <!-- Sector Filter -->
-                <div class="lg:col-span-3">
-                    <select name="sector" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors cursor-pointer">
+                <div class="space-y-1.5">
+                    <label for="filterSectorSelect" class="block text-xs font-bold text-slate-700">Industry Sector</label>
+                    <select id="filterSectorSelect" name="sector" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors cursor-pointer">
                         <option value="">All Sectors</option>
                         <% if (availableSectors && availableSectors.length > 0) { %>
                             <% availableSectors.forEach(sec => { %>
@@ -100,62 +128,56 @@
                 </div>
 
                 <!-- Location Filter -->
-                <div class="lg:col-span-3 relative">
-                    <i class="ph-bold ph-map-pin absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
-                    <input type="text" name="location" value="<%= query ? (query.location || '') : '' %>" placeholder="District or State..."
-                        class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors" />
+                <div class="space-y-1.5">
+                    <label for="filterLocationInput" class="block text-xs font-bold text-slate-700">Location</label>
+                    <div class="relative">
+                        <i class="ph-bold ph-map-pin absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                        <input type="text" id="filterLocationInput" name="location" value="<%= query ? (query.location || '') : '' %>" placeholder="District or State..."
+                            class="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors" />
+                    </div>
                 </div>
 
                 <!-- Sort Selection -->
-                <div class="lg:col-span-2">
-                    <select name="sort" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors cursor-pointer">
+                <div class="space-y-1.5">
+                    <label for="filterSortSelect" class="block text-xs font-bold text-slate-700">Sort By</label>
+                    <select id="filterSortSelect" name="sort" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-colors cursor-pointer">
                         <option value="latest" <%= (query && query.sort === 'latest') ? 'selected' : '' %>>Sort: Latest</option>
                         <option value="stipend_high" <%= (query && query.sort === 'stipend_high') ? 'selected' : '' %>>Stipend: High to Low</option>
                         <option value="stipend_low" <%= (query && query.sort === 'stipend_low') ? 'selected' : '' %>>Stipend: Low to High</option>
                         <option value="vacancies" <%= (query && query.sort === 'vacancies') ? 'selected' : '' %>>Most Vacancies</option>
                     </select>
                 </div>
-            </div>
 
-            <%- include('../partials/internship-filter-panel') %>
+                <!-- Detailed Filters Panel (Skills, Stipend, Duration) -->
+                <%- include('../partials/internship-filter-panel') %>
 
-            <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                <div class="flex items-center gap-2">
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
+                <!-- Action Buttons -->
+                <div class="pt-2 space-y-2 border-t border-slate-100">
+                    <button type="submit" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
                         <i class="ph-bold ph-funnel"></i> Apply Filters
                     </button>
-                    <button type="button" id="clear-filters-btn"
-                        class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-colors flex items-center gap-1.5 cursor-pointer">
-                        <i class="ph-bold ph-x-circle"></i> Clear Filters
-                    </button>
+
                     <% if (currentUser && currentUser.role === 'candidate') { %>
                         <div data-live-region="save-search">
                             <% if (canSaveCurrentSearch) { %>
                                 <button type="button" data-save-search-open
                                     data-criteria="<%= JSON.stringify(savedSearchCriteria) %>"
                                     data-return-to="<%= savedSearchReturnUrl %>"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+                                    class="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 cursor-pointer">
                                     <i class="ph-bold ph-bookmark-simple text-sm"></i>
                                     Save this search
                                 </button>
                             <% } else { %>
-                                <span class="hidden text-[11px] font-medium text-slate-400 sm:inline">Choose a filter to save this search</span>
+                                <span class="block text-center text-[11px] font-medium text-slate-400 py-1">Choose a filter to save this search</span>
                             <% } %>
                         </div>
                     <% } %>
                 </div>
-                <span class="text-slate-500 font-medium" data-live-region="count" aria-live="polite">
-                    <% if (!paginationData || paginationData.totalItems === 0) { %>
-                        0 Opportunities
-                    <% } else if (paginationData.totalItems <= paginationData.limit) { %>
-                        Showing <%= paginationData.totalItems %> <%= paginationData.totalItems === 1 ? 'Opportunity' : 'Opportunities' %>
-                    <% } else { %>
-                        Showing <%= paginationData.startItem %>–<%= paginationData.endItem %> of <%= paginationData.totalItems %> Opportunities
-                    <% } %>
-                </span>
-            </div>
-        </form>
-    </div>
+            </form>
+        </aside>
+
+        <!-- Right Side: Stream of Opportunities -->
+        <main class="flex-1 min-w-0 w-full space-y-4">
 
     <% if (currentUser && currentUser.role === 'candidate') { %>
         <div id="saveSearchModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="saveSearchTitle" aria-hidden="true">
@@ -245,9 +267,38 @@
     <% } %>
 
     <%# Swapped in place by the filter script. data-state carries the filters the server actually applied. %>
-    <div data-live-region="results" data-state="<%= JSON.stringify(query) %>" aria-live="polite" class="transition-opacity scroll-mt-24">
+    <div data-live-region="results" data-state="<%= JSON.stringify(query) %>" aria-live="polite" class="transition-opacity scroll-mt-24 space-y-4">
 
-    <%- include('../partials/internship-active-filters') %>
+        <!-- Top Results Bar: Count Indicator, Mobile Filters Button, and Active Filter Chips -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
+            <div class="flex items-center gap-2.5">
+                <!-- Mobile Filter Drawer Trigger (lg:hidden) -->
+                <button type="button" id="openMobileFiltersBtn"
+                    class="lg:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer shadow-2xs">
+                    <i class="ph-bold ph-faders text-indigo-600 text-sm"></i>
+                    <span>Filters</span>
+                    <% const activeChipsList = (typeof activeFilters !== 'undefined' && Array.isArray(activeFilters)) ? activeFilters : []; %>
+                    <% if (activeChipsList.length > 0) { %>
+                        <span class="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-indigo-600 text-white text-[9px] font-bold tabular-nums">
+                            <%= activeChipsList.length %>
+                        </span>
+                    <% } %>
+                </button>
+
+                <span class="text-xs font-bold text-slate-800" data-live-region="count" aria-live="polite">
+                    <% if (!paginationData || paginationData.totalItems === 0) { %>
+                        0 Opportunities
+                    <% } else if (paginationData.totalItems <= paginationData.limit) { %>
+                        Showing <%= paginationData.totalItems %> <%= paginationData.totalItems === 1 ? 'Opportunity' : 'Opportunities' %>
+                    <% } else { %>
+                        Showing <%= paginationData.startItem %>–<%= paginationData.endItem %> of <%= paginationData.totalItems %> Opportunities
+                    <% } %>
+                </span>
+            </div>
+
+            <!-- Active filter chips -->
+            <%- include('../partials/internship-active-filters') %>
+        </div>
 
     <% if (!internships || internships.length === 0) { %>
         <div class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm my-6">
@@ -263,7 +314,7 @@
             </a>
         </div>
     <% } else { %>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-animate-stagger>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" data-animate-stagger>
         <% internships.forEach(item => { %>
             <% const isItemPaused = item.status === 'paused' || item.isPaused; %>
             <% const isOwnedByCurrentCompany = currentUserCompanyId && item.companyId && item.companyId.toString() === currentUserCompanyId.toString(); %>
@@ -526,6 +577,8 @@
     <% } %>
 
     </div>
+    </main>
+</div>
 
     <% if (canCreateListings) { %>
     <!-- POST NEW MODAL -->
@@ -880,4 +933,46 @@
                 }
             });
         });
+    </script>
+
+    <!-- Mobile Filter Drawer Controller -->
+    <script>
+        (() => {
+            const sidebar = document.getElementById('filterSidebar');
+            const backdrop = document.getElementById('filterBackdrop');
+
+            function openDrawer() {
+                if (sidebar) sidebar.classList.remove('-translate-x-full');
+                if (backdrop) backdrop.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden', 'lg:overflow-auto');
+            }
+
+            function closeDrawer() {
+                if (sidebar) sidebar.classList.add('-translate-x-full');
+                if (backdrop) backdrop.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden', 'lg:overflow-auto');
+            }
+
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('#openMobileFiltersBtn')) {
+                    openDrawer();
+                    return;
+                }
+                if (e.target.closest('#closeMobileFiltersBtn') || e.target === backdrop) {
+                    closeDrawer();
+                }
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && sidebar && !sidebar.classList.contains('-translate-x-full')) {
+                    closeDrawer();
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 1024) {
+                    closeDrawer();
+                }
+            });
+        })();
     </script>
