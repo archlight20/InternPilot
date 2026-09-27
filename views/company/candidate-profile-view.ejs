@@ -115,7 +115,7 @@
                     </div>
                     <div>
                         <span class="text-slate-400 font-medium block mb-1">Application Status</span>
-                        <% const isReadOnlyStatus = ['Withdrawn', 'withdrawn', 'Hired', 'Offer Declined'].includes(application.status); %>
+                        <% const isReadOnlyStatus = ['Withdrawn', 'withdrawn', 'Interview', 'Hired', 'Offer Declined'].includes(application.status); %>
                         <% if (!isReadOnlyStatus && canReviewApplications) { %>
                             <form action="/company/applications/<%= application._id %>/status"
                                 method="POST" class="inline-block">
