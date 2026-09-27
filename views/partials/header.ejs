@@ -4,6 +4,7 @@
         opportunities: ['/internships'],
         candidateProfile: ['/candidate/profile', '/candidate/resume-builder'],
         applications: ['/candidate/applications', '/candidate/my-applications'],
+        candidateAnalytics: ['/candidate/analytics', '/candidate/insights'],
         certificates: ['/candidate/certificates'],
         savedInternships: ['/candidate/saved-internships'],
         savedSearches: ['/candidate/saved-searches'],
@@ -51,7 +52,7 @@
             ? 'border-indigo-700 bg-indigo-50 text-indigo-900 font-bold'
             : 'border-transparent text-slate-600 font-semibold hover:bg-slate-100 hover:text-indigo-700'
     ].join(' ');
-    const navPrefixAttribute = name => navPrefixes[name].join('|');
+    const navPrefixAttribute = name => (navPrefixes[name] || []).join('|');
 %>
 
 <!-- Top Tricolor Border Line -->
@@ -88,6 +89,7 @@
                         <% if (currentUser.role === 'candidate') { %>
                             <a href="/candidate/profile" data-nav-link data-nav-variant="desktop" data-nav-prefixes="<%= navPrefixAttribute('candidateProfile') %>" class="<%= desktopLinkClass(isActive('candidateProfile')) %>" <%- ariaCurrent(isActive('candidateProfile')) %>>Candidate Profile</a>
                             <a href="/candidate/applications" data-nav-link data-nav-variant="desktop" data-nav-prefixes="<%= navPrefixAttribute('applications') %>" class="<%= desktopLinkClass(isActive('applications')) %>" <%- ariaCurrent(isActive('applications')) %>>My Applications</a>
+                            <a href="/candidate/analytics" data-nav-link data-nav-variant="desktop" data-nav-prefixes="<%= navPrefixAttribute('candidateAnalytics') %>" class="<%= desktopLinkClass(isActive('candidateAnalytics')) %>" <%- ariaCurrent(isActive('candidateAnalytics')) %>>Analytics</a>
                             <a href="/candidate/certificates" data-nav-link data-nav-variant="desktop" data-nav-prefixes="<%= navPrefixAttribute('certificates') %>" class="<%= desktopLinkClass(isActive('certificates')) %>" <%- ariaCurrent(isActive('certificates')) %>>Certificates</a>
                             <a href="/recommendations/<%= currentUser._id %>" data-nav-link data-nav-variant="desktop" data-nav-prefixes="<%= navPrefixAttribute('recommendations') %>" class="<%= desktopLinkClass(isActive('recommendations')) %>" <%- ariaCurrent(isActive('recommendations')) %>>Recommendations</a>
                             <div class="group relative inline-block">
@@ -180,11 +182,19 @@
                                     <p class="truncate text-xs font-bold text-slate-800" title="<%= currentUser.name %>"><%= currentUser.name %></p>
                                     <p class="truncate text-[11px] capitalize text-slate-500"><%= currentUser.role %></p>
                                 </div>
-                                <a href="/auth/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50">
-                                    <i class="ph-bold ph-sign-out"></i> Log Out
+                                <% if (currentUser.role === 'candidate') { %>
+                                    <a href="/candidate/analytics" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                                        <i class="ph-bold ph-chart-line-up text-indigo-600"></i> Application Insights
+                                    </a>
+                                <% } %>
+                                <a href="/account/privacy" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                                    <i class="ph-bold ph-shield-check text-indigo-600"></i> Privacy Center
                                 </a>
-                                <a href="/account/sessions" class="flex items-center gap-2 border-t border-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-indigo-600">
-                                    <i class="ph-bold ph-devices"></i> Signed-in devices
+                                <a href="/account/sessions" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                                    <i class="ph-bold ph-devices text-indigo-600"></i> Signed-in devices
+                                </a>
+                                <a href="/auth/logout" class="flex items-center gap-2 border-t border-slate-100 px-4 py-2.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50">
+                                    <i class="ph-bold ph-sign-out"></i> Log Out
                                 </a>
                             </div>
                         </div>
@@ -206,6 +216,7 @@
                     <% if (currentUser.role === 'candidate') { %>
                         <a href="/candidate/profile" data-nav-link data-nav-variant="mobile" data-nav-prefixes="<%= navPrefixAttribute('candidateProfile') %>" class="<%= mobileLinkClass(isActive('candidateProfile')) %>" <%- ariaCurrent(isActive('candidateProfile')) %>>Candidate Profile</a>
                         <a href="/candidate/applications" data-nav-link data-nav-variant="mobile" data-nav-prefixes="<%= navPrefixAttribute('applications') %>" class="<%= mobileLinkClass(isActive('applications')) %>" <%- ariaCurrent(isActive('applications')) %>>My Applications</a>
+                        <a href="/candidate/analytics" data-nav-link data-nav-variant="mobile" data-nav-prefixes="<%= navPrefixAttribute('candidateAnalytics') %>" class="<%= mobileLinkClass(isActive('candidateAnalytics')) %>" <%- ariaCurrent(isActive('candidateAnalytics')) %>>Analytics & Insights</a>
                         <a href="/candidate/certificates" data-nav-link data-nav-variant="mobile" data-nav-prefixes="<%= navPrefixAttribute('certificates') %>" class="<%= mobileLinkClass(isActive('certificates')) %>" <%- ariaCurrent(isActive('certificates')) %>>Certificates</a>
                         <a href="/candidate/saved-searches" data-nav-link data-nav-variant="mobile" data-nav-prefixes="<%= navPrefixAttribute('savedSearches') %>" class="<%= mobileLinkClass(isActive('savedSearches')) %>" <%- ariaCurrent(isActive('savedSearches')) %>>Saved Searches</a>
                         <a href="/recommendations/<%= currentUser._id %>" data-nav-link data-nav-variant="mobile" data-nav-prefixes="<%= navPrefixAttribute('recommendations') %>" class="<%= mobileLinkClass(isActive('recommendations')) %>" <%- ariaCurrent(isActive('recommendations')) %>>Recommendations</a>

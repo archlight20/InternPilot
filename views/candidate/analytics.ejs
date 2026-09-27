@@ -1,0 +1,509 @@
+<% layout('layouts/boilerplate') %>
+
+<%
+    const totals = analytics && analytics.totals ? analytics.totals : {};
+    const funnel = analytics && Array.isArray(analytics.funnel) ? analytics.funnel : [];
+    const sectors = analytics && Array.isArray(analytics.sectors) ? analytics.sectors : [];
+    const workModes = analytics && Array.isArray(analytics.workModes) ? analytics.workModes : [];
+    const topCompanies = analytics && Array.isArray(analytics.topCompanies) ? analytics.topCompanies : [];
+    const profileHealth = analytics && analytics.profileHealth ? analytics.profileHealth : { percentage: 0 };
+    const insights = analytics && Array.isArray(analytics.insights) ? analytics.insights : [];
+    const recentActivity = analytics && Array.isArray(analytics.recentActivity) ? analytics.recentActivity : [];
+    const rangeDays = analytics && analytics.days ? analytics.days : 30;
+    const currentRange = analytics && analytics.range ? analytics.range : '30';
+    const hasApplications = Boolean(totals.submitted && totals.submitted.current > 0);
+%>
+
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Hero / Header Section -->
+    <header class="ip-hero flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <div class="flex items-center gap-2">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100/80">Candidate Intelligence</p>
+                <span class="inline-flex items-center gap-1 rounded-full bg-indigo-500/30 px-2 py-0.5 text-[10px] font-bold text-indigo-100 border border-indigo-400/30">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live Insights
+                </span>
+            </div>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">Application Analytics & Insights</h1>
+            <p class="mt-1 text-sm text-indigo-100/90">Visual metrics, conversion pipeline velocity, and data-driven recommendations.</p>
+        </div>
+
+        <div class="flex items-center gap-3 flex-wrap">
+            <!-- Time Window Selector Form -->
+            <form method="GET" action="/candidate/analytics" class="flex items-center gap-1.5 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/20">
+                <span class="text-[11px] font-semibold text-indigo-100 pl-2 pr-1 hidden sm:inline">Window:</span>
+                <% [
+                    { value: '7', label: '7 Days' },
+                    { value: '30', label: '30 Days' },
+                    { value: '90', label: '90 Days' },
+                    { value: 'all', label: 'All Time' }
+                ].forEach(opt => { %>
+                    <a href="/candidate/analytics?range=<%= opt.value %>"
+                       class="px-2.5 py-1 text-xs font-bold rounded-lg transition-colors <%= currentRange === opt.value ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-100 hover:text-white hover:bg-white/10' %>">
+                        <%= opt.label %>
+                    </a>
+                <% }) %>
+            </form>
+
+            <a href="/candidate/applications"
+                class="inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-xs font-bold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-200">
+                <i class="ph-bold ph-list-dashes text-sm" aria-hidden="true"></i>
+                Applications List
+            </a>
+        </div>
+    </header>
+
+    <% if (!hasApplications) { %>
+        <!-- Encouraging Empty State for Candidates with zero applications -->
+        <div class="rounded-3xl border border-slate-200 bg-white p-8 sm:p-12 shadow-sm text-center max-w-3xl mx-auto my-8">
+            <div class="mx-auto w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-5 shadow-inner">
+                <i class="ph-bold ph-chart-line-up text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Your Search Journey Starts Here</h2>
+            <p class="text-sm text-slate-500 mt-2 max-w-lg mx-auto leading-relaxed">
+                As soon as you apply to PMIS internship opportunities, this dashboard will visualize your pipeline stages, response timelines, and recruitment conversion metrics.
+            </p>
+
+            <div class="grid gap-4 sm:grid-cols-3 mt-8 text-left max-w-xl mx-auto">
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div class="h-7 w-7 rounded-lg bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mb-2">1</div>
+                    <p class="text-xs font-bold text-slate-800">Complete Profile</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">Reach 85%+ completion to maximize recruiter discovery.</p>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div class="h-7 w-7 rounded-lg bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mb-2">2</div>
+                    <p class="text-xs font-bold text-slate-800">Discover Roles</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">Explore openings from verified partner companies.</p>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div class="h-7 w-7 rounded-lg bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mb-2">3</div>
+                    <p class="text-xs font-bold text-slate-800">Track Signals</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">Monitor review updates, shortlists, and interviews.</p>
+                </div>
+            </div>
+
+            <div class="mt-8 flex items-center justify-center gap-3 flex-wrap">
+                <a href="/candidate/profile" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors shadow-2xs">
+                    Complete Profile (<%= profileHealth.percentage %>% Done)
+                </a>
+                <a href="/internships" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors shadow-sm flex items-center gap-2">
+                    <i class="ph-bold ph-magnifying-glass"></i> Explore Internships
+                </a>
+            </div>
+        </div>
+    <% } else { %>
+
+        <!-- Overview KPI Cards -->
+        <% 
+            const kpiItems = [
+                {
+                    label: 'Total Submitted',
+                    val: totals.submitted ? totals.submitted.current : 0,
+                    change: totals.submitted ? totals.submitted.change : 0,
+                    icon: 'ph-paper-plane-tilt',
+                    gradient: 'from-indigo-600 to-indigo-700',
+                    badge: currentRange !== 'all' ? `${totals.submitted.change >= 0 ? '+' : ''}${totals.submitted.change}% vs prev` : 'Lifetime'
+                },
+                {
+                    label: 'Active Pipeline',
+                    val: totals.active ? totals.active.current : 0,
+                    change: null,
+                    icon: 'ph-hourglass-high',
+                    gradient: 'from-sky-500 to-sky-600',
+                    badge: `${totals.active ? totals.active.percentage : 0}% of all applied`
+                },
+                {
+                    label: 'Shortlist & Interview Rate',
+                    val: `${totals.shortlistRate ? totals.shortlistRate.current : 0}%`,
+                    change: totals.shortlistRate ? totals.shortlistRate.change : 0,
+                    icon: 'ph-star',
+                    gradient: 'from-violet-500 to-violet-600',
+                    badge: totals.shortlistRate.current >= 20 ? 'Above platform avg' : 'In line with platform'
+                },
+                {
+                    label: 'Offers / Placed',
+                    val: totals.offers ? totals.offers.current : 0,
+                    change: totals.offers ? totals.offers.change : 0,
+                    icon: 'ph-handshake',
+                    gradient: 'from-emerald-500 to-emerald-600',
+                    badge: totals.offers.current > 0 ? 'Offer accepted' : 'Pending outcomes'
+                },
+                {
+                    label: 'Avg Response Time',
+                    val: totals.avgResponseDays ? `${totals.avgResponseDays}d` : '7–10d',
+                    change: null,
+                    icon: 'ph-clock',
+                    gradient: 'from-amber-500 to-amber-600',
+                    badge: totals.avgResponseDays ? 'Based on recruiter activity' : 'Typical industry range'
+                }
+            ];
+        %>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5" data-animate-stagger>
+            <% kpiItems.forEach(kpi => { %>
+                <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500"><%= kpi.label %></p>
+                        <span class="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br <%= kpi.gradient %> text-white shadow-xs">
+                            <i class="ph-bold <%= kpi.icon %> text-base" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <div class="mt-3">
+                        <p class="text-2xl font-extrabold tracking-tight text-slate-900" data-count-up><%= kpi.val %></p>
+                        <p class="mt-1 text-[11px] font-medium text-slate-400">
+                            <span class="inline-block py-0.5 px-1.5 rounded-md bg-slate-100 text-slate-600 font-semibold"><%= kpi.badge %></span>
+                        </p>
+                    </div>
+                </article>
+            <% }) %>
+        </div>
+
+        <!-- Funnel and Activity Chart Section -->
+        <div class="grid gap-6 lg:grid-cols-12" data-animate-stagger>
+            <!-- Application Pipeline Funnel (5 cols on lg) -->
+            <article class="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900">Application Funnel & Progression</h2>
+                            <p class="text-xs text-slate-500">Stage-by-stage velocity from submission to placement.</p>
+                        </div>
+                        <i class="ph-bold ph-funnel-simple text-indigo-600 text-lg"></i>
+                    </div>
+
+                    <div class="mt-5 space-y-4">
+                        <% funnel.forEach((stage, idx) => { %>
+                            <div>
+                                <div class="flex items-center justify-between text-xs mb-1">
+                                    <div class="flex items-center gap-1.5 font-bold text-slate-800">
+                                        <i class="ph-bold <%= stage.icon %> text-<%= stage.color %>-600"></i>
+                                        <span><%= stage.label %></span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-extrabold text-slate-900 text-sm"><%= stage.count %></span>
+                                        <span class="text-[11px] font-medium text-slate-400">(<%= stage.percentage %>%)</span>
+                                    </div>
+                                </div>
+                                <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div class="h-full rounded-full transition-all duration-500 bg-<%= stage.color %>-600"
+                                         style="width: <%= Math.max(stage.percentage > 0 ? stage.percentage : (stage.count > 0 ? 4 : 0), 0) %>%;"></div>
+                                </div>
+                                <% if (idx > 0 && stage.conversion !== undefined) { %>
+                                    <div class="flex justify-end mt-0.5">
+                                        <span class="text-[10px] text-slate-400 font-medium"><%= stage.conversion %>% pass-through from previous stage</span>
+                                    </div>
+                                <% } %>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>Terminal outcomes:</span>
+                    <div class="flex items-center gap-3">
+                        <span class="inline-flex items-center gap-1 font-semibold text-slate-600">
+                            <span class="h-2 w-2 rounded-full bg-slate-400"></span> Withdrawn: <strong><%= totals.withdrawn || 0 %></strong>
+                        </span>
+                        <span class="inline-flex items-center gap-1 font-semibold text-rose-600">
+                            <span class="h-2 w-2 rounded-full bg-rose-400"></span> Rejected: <strong><%= totals.rejected || 0 %></strong>
+                        </span>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Activity & Trend Chart (7 cols on lg) -->
+            <article class="lg:col-span-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900">Submission & Response Timeline</h2>
+                            <p class="text-xs text-slate-500">Weekly cadence of your application activity vs employer responses.</p>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs font-semibold">
+                            <span class="inline-flex items-center gap-1.5 text-indigo-700">
+                                <span class="h-2.5 w-2.5 rounded-full bg-indigo-600"></span> Submissions
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 text-emerald-700">
+                                <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Status Updates
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 h-64 sm:h-72 w-full relative">
+                        <canvas id="candidateActivityChart" aria-label="Application submission and response activity chart"></canvas>
+                    </div>
+                </div>
+
+                <p class="mt-2 text-[11px] text-slate-400 text-right">
+                    Signals reflect activity recorded over the selected <%= rangeDays %> day period.
+                </p>
+            </article>
+        </div>
+
+        <!-- Domain, Work-Mode, and Actionable Insights Section -->
+        <div class="grid gap-6 lg:grid-cols-12" data-animate-stagger>
+            <!-- Domain & Sector Breakdown (4 cols) -->
+            <article class="lg:col-span-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 class="text-sm font-bold text-slate-900">Target Industry Sectors</h2>
+                    <i class="ph-bold ph-buildings text-indigo-600 text-lg"></i>
+                </div>
+                <div class="mt-4 space-y-3">
+                    <% if (sectors && sectors.length > 0) { %>
+                        <% sectors.forEach(item => { %>
+                            <div>
+                                <div class="flex items-center justify-between text-xs mb-1">
+                                    <span class="font-semibold text-slate-700 truncate max-w-[180px]"><%= item.sector %></span>
+                                    <span class="font-bold text-slate-900"><%= item.count %> <span class="text-slate-400 font-normal">(<%= item.percentage %>%)</span></span>
+                                </div>
+                                <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div class="h-full rounded-full transition-all duration-300" style="background-color: <%= item.color %>; width: <%= item.percentage %>%;"></div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    <% } else { %>
+                        <p class="text-xs text-slate-400 py-4 text-center">No sector signals recorded.</p>
+                    <% } %>
+                </div>
+
+                <!-- Work Mode Distribution -->
+                <div class="mt-6 pt-4 border-t border-slate-100">
+                    <p class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">Work Arrangement</p>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <% workModes.forEach(wm => { %>
+                            <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                                <p class="text-[11px] font-bold text-slate-600"><%= wm.mode %></p>
+                                <p class="text-base font-extrabold text-slate-900 mt-0.5"><%= wm.count %></p>
+                                <p class="text-[10px] text-slate-400 font-semibold"><%= wm.percentage %>%</p>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Actionable Recommendations & Smart Tips (5 cols) -->
+            <article class="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div class="flex items-center gap-2">
+                            <i class="ph-bold ph-lightbulb text-amber-500 text-lg"></i>
+                            <h2 class="text-sm font-bold text-slate-900">Actionable Recommendations</h2>
+                        </div>
+                        <span class="text-xs font-semibold text-slate-400"><%= insights.length %> suggestions</span>
+                    </div>
+
+                    <div class="mt-4 space-y-3">
+                        <% insights.forEach(tip => { %>
+                            <div class="p-3.5 rounded-xl border <%= tip.type === 'warning' ? 'border-amber-200 bg-amber-50/60' : (tip.type === 'success' ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-slate-50/70') %>">
+                                <div class="flex items-start gap-2.5">
+                                    <div class="p-1 rounded-lg <%= tip.type === 'warning' ? 'bg-amber-100 text-amber-700' : (tip.type === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700') %> shrink-0 mt-0.5">
+                                        <i class="ph-bold <%= tip.icon %> text-sm"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-xs font-bold text-slate-900 leading-snug"><%= tip.title %></p>
+                                        <p class="text-[11px] text-slate-600 mt-1 leading-normal"><%= tip.message %></p>
+                                        <% if (tip.actionText && tip.actionHref) { %>
+                                            <a href="<%= tip.actionHref %>" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 hover:underline mt-2">
+                                                <%= tip.actionText %> <i class="ph-bold ph-arrow-right text-[10px]"></i>
+                                            </a>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>Need more interview prep?</span>
+                    <a href="/interview" class="font-bold text-indigo-600 hover:text-indigo-800">Launch Mock Room &rarr;</a>
+                </div>
+            </article>
+
+            <!-- Profile Health & Top Target Employers (3 cols) -->
+            <article class="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <h2 class="text-sm font-bold text-slate-900">Profile Health</h2>
+                        <i class="ph-bold ph-heartbeat text-rose-500 text-lg"></i>
+                    </div>
+
+                    <div class="mt-4 text-center p-4 rounded-xl bg-slate-50 border border-slate-100">
+                        <div class="relative inline-flex items-center justify-center">
+                            <div class="text-2xl font-black text-slate-900"><%= profileHealth.percentage %>%</div>
+                        </div>
+                        <p class="text-xs font-bold text-slate-800 mt-1">Profile Strength</p>
+                        <p class="text-[10px] text-slate-500 mt-0.5">
+                            <%= profileHealth.percentage >= 85 ? 'Optimized for algorithm matching' : 'Add missing skills or resume to improve' %>
+                        </p>
+                        <a href="/candidate/profile" class="mt-3 inline-block px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-[11px] transition-colors">
+                            Manage Profile
+                        </a>
+                    </div>
+
+                    <div class="mt-5">
+                        <p class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Top Organizations Applied</p>
+                        <% if (topCompanies && topCompanies.length > 0) { %>
+                            <ul class="space-y-2 text-xs">
+                                <% topCompanies.forEach(comp => { %>
+                                    <li class="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
+                                        <span class="font-semibold text-slate-700 truncate max-w-[130px]" title="<%= comp.name %>"><%= comp.name %></span>
+                                        <span class="font-bold text-indigo-600"><%= comp.count %> <%= comp.count === 1 ? 'app' : 'apps' %></span>
+                                    </li>
+                                <% }) %>
+                            </ul>
+                        <% } else { %>
+                            <p class="text-[11px] text-slate-400">No applications recorded.</p>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-100">
+                    <a href="/internships" class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors shadow-2xs">
+                        <i class="ph-bold ph-plus-circle"></i> Apply to More
+                    </a>
+                </div>
+            </article>
+        </div>
+
+        <!-- Recent Application Activity Table -->
+        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-900">Recent Status Activity</h2>
+                    <p class="text-xs text-slate-500">Live feed of your most recently updated opportunities.</p>
+                </div>
+                <a href="/candidate/applications" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline">
+                    View all applications &rarr;
+                </a>
+            </div>
+
+            <div class="mt-4 overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-2.5 rounded-l-lg">Opportunity</th>
+                            <th class="px-4 py-2.5">Company</th>
+                            <th class="px-4 py-2.5">Status</th>
+                            <th class="px-4 py-2.5">Last Updated</th>
+                            <th class="px-4 py-2.5 text-right rounded-r-lg">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <% if (recentActivity && recentActivity.length > 0) { %>
+                            <% recentActivity.forEach(item => { %>
+                                <tr class="hover:bg-slate-50/70 transition-colors">
+                                    <td class="px-4 py-3 font-bold text-slate-900">
+                                        <%= item.title %>
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600 font-medium">
+                                        <%= item.company %>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <% 
+                                            const s = String(item.status).toLowerCase();
+                                            let badgeCls = 'bg-slate-100 text-slate-700 border-slate-200';
+                                            if (s === 'under review') badgeCls = 'bg-sky-50 text-sky-700 border-sky-200';
+                                            else if (s === 'shortlisted') badgeCls = 'bg-violet-50 text-violet-700 border-violet-200';
+                                            else if (s === 'interview') badgeCls = 'bg-amber-50 text-amber-700 border-amber-200';
+                                            else if (s === 'hired') badgeCls = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                            else if (s === 'rejected') badgeCls = 'bg-rose-50 text-rose-700 border-rose-200';
+                                            else if (s === 'withdrawn') badgeCls = 'bg-slate-100 text-slate-500 border-slate-300';
+                                        %>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border <%= badgeCls %>">
+                                            <%= item.status %>
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-500">
+                                        <%= item.date ? new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' %>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <a href="/candidate/applications?search=<%= encodeURIComponent(item.title) %>" class="font-bold text-indigo-600 hover:text-indigo-800">
+                                            Details
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="5" class="px-4 py-6 text-center text-slate-400">No application activity yet.</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+    <% } %>
+</div>
+
+<!-- Chart.js CDN for interactive visual trend analysis -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function () {
+        var canvas = document.getElementById('candidateActivityChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        var rawData = <%- safeJson(analytics.timeline) %>;
+        var data = rawData || { labels: [], submissions: [], responses: [] };
+
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: 'Applications Submitted',
+                        data: data.submissions,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#4f46e5',
+                        pointBorderColor: '#fff',
+                        pointHoverRadius: 6,
+                        tension: 0.35,
+                        fill: true
+                    },
+                    {
+                        label: 'Status Updates & Responses',
+                        data: data.responses,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointHoverRadius: 6,
+                        tension: 0.35,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        padding: 10,
+                        cornerRadius: 8,
+                        titleFont: { size: 12, weight: 'bold' },
+                        bodyFont: { size: 11 }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 10 }, color: '#64748b' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' },
+                        ticks: { precision: 0, font: { size: 10 }, color: '#64748b' }
+                    }
+                }
+            }
+        });
+    })();
+</script>

@@ -24,6 +24,7 @@ const {
     matchesInternshipCriteria,
     describeSavedSearchCriteria
 } = require('../utils/queryHelper');
+const { computeCandidateAnalytics, safeJson } = require('../utils/candidateAnalytics');
 
 const MAX_SAVED_SEARCHES = 10;
 
@@ -488,6 +489,48 @@ router.get('/candidate/saved-searches/:id/results', isAuthenticated, authorize('
         if (req.flash) req.flash('error_msg', error.message || 'Unable to open this saved search.');
         return res.redirect('/candidate/saved-searches');
     }
+});
+
+/**
+ * GET /candidate/analytics
+ * Dedicated Candidate Analytics Dashboard & Application Insights.
+ */
+router.get('/candidate/analytics', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const candidate = await User.findById(userId);
+        const range = req.query.range || '30';
+
+        const applications = await Application.find({ candidate: userId })
+            .populate('internship')
+            .sort({ appliedAt: -1, createdAt: -1 });
+
+        const analytics = computeCandidateAnalytics(candidate, applications, { range });
+
+        if (req.xhr || req.headers.accept?.includes('application/json')) {
+            return res.json({ success: true, analytics });
+        }
+
+        res.render('candidate/analytics', {
+            candidate,
+            currentUser: req.user,
+            analytics,
+            safeJson,
+            pageTitle: 'Application Analytics & Insights'
+        });
+    } catch (error) {
+        console.error('Error loading candidate analytics:', error);
+        if (req.flash) req.flash('error_msg', 'Unable to load analytics at this time.');
+        res.redirect('/candidate/applications');
+    }
+});
+
+/**
+ * GET /candidate/insights (alias for /candidate/analytics)
+ */
+router.get('/candidate/insights', isAuthenticated, authorize('candidate'), (req, res) => {
+    const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.redirect('/candidate/analytics' + qs);
 });
 
 /**
