@@ -1,0 +1,34 @@
+<% layout('layouts/boilerplate') %>
+<div class="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <%- include('partials/sidebar', { section: 'overview' }) %>
+    <section class="min-w-0 space-y-6">
+        <header class="flex flex-col gap-4 rounded-2xl bg-slate-900 p-6 text-white shadow-sm sm:flex-row sm:items-end sm:justify-between">
+            <div><p class="text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">Admin console</p><h1 class="mt-1 text-3xl font-bold">Platform overview</h1><p class="mt-1 text-sm text-slate-300">Operational signals for the selected period.</p></div>
+            <form method="GET" class="flex items-end gap-2"><label class="text-xs font-semibold">Range<select name="range" class="mt-1 block rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900"><% [7,30,90].forEach(range => { %><option value="<%= range %>" <%= analytics.days === range ? 'selected' : '' %>><%= range %> days</option><% }) %></select></label><button class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-bold hover:bg-indigo-400">Apply</button></form>
+        </header>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <% [['Candidates', analytics.totals.candidates], ['Companies', analytics.totals.companies], ['Listings', analytics.totals.listings], ['Applications', analytics.totals.applications], ['Hires', analytics.totals.hires]].forEach(([label, stat]) => { %>
+                <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-bold uppercase tracking-wider text-slate-500"><%= label %></p><p class="mt-2 text-3xl font-bold text-slate-900"><%= stat.current %></p><p class="mt-1 text-xs font-semibold <%= stat.change >= 0 ? 'text-emerald-600' : 'text-rose-600' %>"><%= stat.change >= 0 ? '+' : '' %><%= stat.change %>% vs previous period</p></article>
+            <% }) %>
+        </div>
+        <div class="grid gap-6 xl:grid-cols-2">
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 class="font-bold text-slate-900">Daily activity</h2><div class="mt-4 h-72"><canvas id="dailyActivityChart" aria-label="Daily sign-ups and applications chart"></canvas></div></article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 class="font-bold text-slate-900">Application funnel</h2><div class="mt-4 space-y-3"><% analytics.funnel.forEach(stage => { %><div><div class="flex justify-between text-sm"><span class="font-semibold text-slate-700"><%= stage.status %></span><span class="text-slate-500"><%= stage.count %> · <%= stage.conversion %>% conversion</span></div><div class="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-indigo-500" style="width: <%= Math.min(100, stage.conversion) %>%"></div></div></div><% }) %><p class="border-t pt-3 text-xs text-slate-500">Rejected: <strong><%= analytics.rejected %></strong> · Withdrawn: <strong><%= analytics.withdrawn %></strong></p></div></article>
+        </div>
+        <div class="grid gap-6 xl:grid-cols-3">
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 class="font-bold text-slate-900">Applications by state</h2><ul class="mt-3 space-y-2 text-sm"><% if (analytics.states.length) { analytics.states.forEach(item => { %><li class="flex justify-between"><span><%= item.state %></span><strong><%= item.count %></strong></li><% }); } else { %><li class="text-slate-500">No applications in this range.</li><% } %></ul></article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 class="font-bold text-slate-900">Top listings</h2><ul class="mt-3 space-y-3 text-sm"><% if (analytics.topListings.length) { analytics.topListings.forEach(item => { %><li><p class="font-semibold"><%= item.title %></p><p class="text-xs text-slate-500"><%= item.companyName %> · <%= item.applications %> applications</p></li><% }); } else { %><li class="text-slate-500">No applications in this range.</li><% } %></ul></article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 class="font-bold text-slate-900">PMIS eligibility</h2><dl class="mt-3 space-y-2 text-sm"><div class="flex justify-between"><dt>Eligible</dt><dd class="font-bold text-emerald-600"><%= analytics.pmis.eligible %></dd></div><div class="flex justify-between"><dt>Ineligible</dt><dd class="font-bold text-rose-600"><%= analytics.pmis.ineligible %></dd></div><div class="flex justify-between"><dt>Incomplete</dt><dd class="font-bold text-amber-600"><%= analytics.pmis.incomplete %></dd></div></dl><h3 class="mt-5 text-sm font-bold text-slate-900">Skills gap</h3><ul class="mt-2 space-y-1 text-xs"><% if (analytics.skillsGap.length) { analytics.skillsGap.forEach(item => { %><li class="flex justify-between"><span><%= item.skill %></span><span class="font-semibold"><%= item.candidates %> candidates</span></li><% }); } else { %><li class="text-slate-500">No skills data in this range.</li><% } %></ul></article>
+        </div>
+        <p class="text-xs text-slate-500">Download data: <a class="font-bold text-indigo-700 hover:underline" href="/admin/console/export/users">Users CSV</a> · <a class="font-bold text-indigo-700 hover:underline" href="/admin/console/export/applications">Applications CSV</a></p>
+    </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function () {
+        var canvas = document.getElementById('dailyActivityChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+        var data = <%- safeJson(analytics.daily) %>;
+        new Chart(canvas, { type: 'line', data: { labels: data.labels, datasets: [{ label: 'Sign-ups', data: data.signups, borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,.12)', tension: .3 }, { label: 'Applications', data: data.applications, borderColor: '#059669', backgroundColor: 'rgba(5,150,105,.12)', tension: .3 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } } });
+    })();
+</script>

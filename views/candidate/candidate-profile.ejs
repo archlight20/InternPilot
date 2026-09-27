@@ -42,6 +42,33 @@
                 criteria: []
             }); %>
 
+    <% const completion = (typeof profileCompletion !== 'undefined' && profileCompletion)
+        ? profileCompletion
+        : ((typeof calculateProfileCompletion === 'function' && activeUser)
+            ? calculateProfileCompletion(activeUser)
+            : {
+                percentage: 0,
+                isComplete: false,
+                level: 'low',
+                score: 0,
+                totalWeight: 100,
+                badge: {
+                    label: 'Getting Started',
+                    colorClass: 'rose',
+                    bgClass: 'bg-rose-50 text-rose-700 border-rose-200',
+                    barClass: 'bg-rose-500',
+                    fillClass: 'text-rose-500',
+                    icon: 'ph-warning-circle'
+                },
+                summaryText: 'Complete your profile to increase visibility to recruiters.',
+                items: [],
+                completedItems: [],
+                missingItems: [],
+                requiredMissingCount: 0,
+                recommendedMissingCount: 0,
+                nextAction: null
+            }); %>
+
         <div class="max-w-7xl mx-auto space-y-6">
 
             <% if (typeof success_msg !== 'undefined' && success_msg && success_msg.length > 0) { %>
@@ -79,6 +106,12 @@
                                 <i class="ph-bold <%= pmisStatus.badge.icon %>"></i>
                                 <%= pmisStatus.badge.label %>
                             </span>
+                            <a href="#profileCompletionCard" id="headerCompletionBadge"
+                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border <%= completion.badge.bgClass %> shadow-xs hover:opacity-90 transition-all cursor-pointer"
+                                title="Click to view profile completion checklist">
+                                <i id="headerCompletionIcon" class="ph-bold <%= completion.badge.icon %>"></i>
+                                <span id="headerCompletionText">Profile: <%= completion.percentage %>%</span>
+                            </a>
                         </div>
                         <p class="text-xs text-slate-500 font-medium flex items-center gap-1 mt-1">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-rose-500" fill="none"
@@ -541,6 +574,113 @@
                 </div>
 
                 <div class="space-y-6">
+                    <!-- Profile Completion Indicator Card -->
+                    <div id="profileCompletionCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5 transition-all">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3.5">
+                            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="ph-bold ph-chart-polar text-indigo-600 text-lg"></i>
+                                Profile Completion
+                            </h2>
+                            <span id="profileLevelBadge"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border <%= completion.badge.bgClass %> shadow-2xs">
+                                <i id="profileLevelIcon" class="ph-bold <%= completion.badge.icon %>"></i>
+                                <span id="profileLevelLabel"><%= completion.badge.label %></span>
+                            </span>
+                        </div>
+
+                        <!-- Overall Percentage Progress Bar -->
+                        <div class="space-y-2.5">
+                            <div class="flex items-baseline justify-between">
+                                <div class="flex items-baseline gap-1.5">
+                                    <span id="profileProgressPercent" class="text-2xl font-extrabold text-slate-800 tracking-tight"><%= completion.percentage %>%</span>
+                                    <span class="text-xs font-semibold text-slate-400">Complete</span>
+                                </div>
+                                <span id="profileScoreFraction" class="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                                    <%= completion.score %> / <%= completion.totalWeight %> pts
+                                </span>
+                            </div>
+
+                            <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-200/80">
+                                <div id="profileProgressBar"
+                                    class="h-full rounded-full transition-all duration-500 <%= completion.badge.barClass %>"
+                                    style="width: <%= completion.percentage %>%;"></div>
+                            </div>
+
+                            <p id="profileSummaryText" class="text-xs text-slate-600 leading-relaxed pt-0.5">
+                                <%= completion.summaryText %>
+                            </p>
+                        </div>
+
+                        <!-- Next Recommended Action Banner -->
+                        <div id="profileNextActionCard" class="<%= completion.isComplete ? 'hidden ' : '' %>bg-indigo-50/60 border border-indigo-100 rounded-xl p-3.5 space-y-2 text-xs">
+                            <div class="flex items-center gap-1.5 text-indigo-900 font-bold text-[11px] uppercase tracking-wider">
+                                <i class="ph-bold ph-sparkle text-indigo-600 text-sm"></i>
+                                <span>Recommended Next Step</span>
+                            </div>
+                            <p id="profileNextActionPrompt" class="text-xs text-indigo-950 font-medium">
+                                <%= completion.nextAction ? completion.nextAction.prompt : 'Keep updating your profile to unlock all benefits.' %>
+                            </p>
+                            <button type="button" id="profileNextActionBtn"
+                                data-action-target="<%= completion.nextAction ? completion.nextAction.actionTarget : 'openModalBtn' %>"
+                                data-action-type="<%= completion.nextAction ? completion.nextAction.actionType : 'modal' %>"
+                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
+                                <i class="ph-bold ph-plus-circle"></i>
+                                <span id="profileNextActionBtnText"><%= completion.nextAction ? completion.nextAction.actionText : 'Complete Details' %></span>
+                            </button>
+                        </div>
+
+                        <!-- Missing Items & Criteria Checklist Breakdown -->
+                        <div class="space-y-3 pt-1 border-t border-slate-100">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Checklist Breakdown</h3>
+                                <span id="profileCompletedCount" class="text-[11px] font-semibold text-slate-500">
+                                    <%= completion.completedItems.length %> of <%= completion.items.length %> completed
+                                </span>
+                            </div>
+
+                            <div id="profileCompletionChecklist" class="space-y-2">
+                                <% completion.items.forEach(item => { %>
+                                    <div data-completion-item-id="<%= item.id %>"
+                                        class="flex items-start justify-between gap-3 p-2.5 rounded-xl border transition-all text-xs <%= item.completed ? 'bg-emerald-50/40 border-emerald-100' : 'bg-slate-50/70 border-slate-200' %>">
+                                        <div class="flex items-start gap-2.5 min-w-0">
+                                            <div data-completion-icon-wrapper
+                                                class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 <%= item.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-400' %>">
+                                                <i class="ph-bold <%= item.completed ? 'ph-check' : 'ph-circle' %> text-[11px]"></i>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                    <span class="font-bold text-slate-800"><%= item.label %></span>
+                                                    <span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded <%= item.category === 'required' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-600' %>">
+                                                        <%= item.category %>
+                                                    </span>
+                                                </div>
+                                                <p data-completion-detail class="text-[11px] text-slate-500 truncate mt-0.5">
+                                                    <%= item.completed ? item.detail : item.description %>
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="shrink-0 flex items-center">
+                                            <% if (item.completed) { %>
+                                                <span data-completion-status-pill class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                    <i class="ph-bold ph-check"></i> +<%= item.weight %>%
+                                                </span>
+                                            <% } else { %>
+                                                <button type="button" data-completion-action="<%= item.id %>"
+                                                    data-action-target="<%= item.actionTarget %>"
+                                                    data-action-type="<%= item.actionType %>"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white hover:bg-indigo-50 text-indigo-700 border border-slate-200 hover:border-indigo-300 transition-colors shadow-2xs cursor-pointer">
+                                                    <span><%= item.actionText %></span>
+                                                    <i class="ph-bold ph-arrow-right text-[10px]"></i>
+                                                </button>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    </div>
+
                     <div id="resumeUploadCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                             <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -1445,6 +1585,255 @@
                             }
                             return;
                         }
+                    });
+                }
+
+                // ── Interactive Profile Completion Engine ──────────────
+                const profileProgressBar = document.getElementById('profileProgressBar');
+                const profileProgressPercent = document.getElementById('profileProgressPercent');
+                const profileScoreFraction = document.getElementById('profileScoreFraction');
+                const profileSummaryText = document.getElementById('profileSummaryText');
+                const profileLevelBadge = document.getElementById('profileLevelBadge');
+                const profileLevelLabel = document.getElementById('profileLevelLabel');
+                const profileLevelIcon = document.getElementById('profileLevelIcon');
+                const headerCompletionBadge = document.getElementById('headerCompletionBadge');
+                const headerCompletionText = document.getElementById('headerCompletionText');
+                const headerCompletionIcon = document.getElementById('headerCompletionIcon');
+                const profileNextActionCard = document.getElementById('profileNextActionCard');
+                const profileNextActionPrompt = document.getElementById('profileNextActionPrompt');
+                const profileNextActionBtn = document.getElementById('profileNextActionBtn');
+                const profileNextActionBtnText = document.getElementById('profileNextActionBtnText');
+                const profileCompletedCount = document.getElementById('profileCompletedCount');
+
+                const initialCandidateState = {
+                    hasName: <%= Boolean(activeUser && activeUser.name) %>,
+                    hasEmail: <%= Boolean(activeUser && activeUser.email) %>,
+                    hasResume: <%= Boolean(hasResume) %>,
+                    projectsCount: <%= (activeUser && Array.isArray(activeUser.projects)) ? activeUser.projects.length : 0 %>,
+                    certificationsCount: <%= (activeUser && Array.isArray(activeUser.certifications)) ? activeUser.certifications.length : 0 %>
+                };
+
+                const handleCompletionAction = (actionType, target) => {
+                    if (actionType === 'modal' || target === 'openModalBtn') {
+                        const btn = document.getElementById('openModalBtn');
+                        if (btn) btn.click();
+                    } else if (actionType === 'scroll' || target === 'resumeUploadCard') {
+                        const card = document.getElementById('resumeUploadCard');
+                        if (card) {
+                            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            if (typeof window.showResumeReplace === 'function') {
+                                window.showResumeReplace();
+                            }
+                        }
+                    } else if (actionType === 'entryModal') {
+                        if (typeof openEntryModal === 'function') {
+                            openEntryModal(target);
+                        } else {
+                            const modalEl = document.getElementById(target);
+                            if (modalEl) {
+                                modalEl.classList.remove('hidden');
+                                modalEl.classList.add('flex');
+                            }
+                        }
+                    }
+                };
+
+                document.querySelectorAll('[data-completion-action]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        handleCompletionAction(btn.dataset.actionType, btn.dataset.actionTarget);
+                    });
+                });
+
+                if (profileNextActionBtn) {
+                    profileNextActionBtn.addEventListener('click', () => {
+                        handleCompletionAction(profileNextActionBtn.dataset.actionType, profileNextActionBtn.dataset.actionTarget);
+                    });
+                }
+
+                const updateLiveProfileCompletion = () => {
+                    if (!profileProgressBar) return;
+
+                    const locInput = document.querySelector('input[name="location"]');
+                    const qualInput = document.getElementById('editQualification');
+                    const instInput = document.querySelector('input[name="institution"]');
+
+                    const hasLocation = Boolean(locInput && locInput.value.trim());
+                    const contactComplete = initialCandidateState.hasName && initialCandidateState.hasEmail && hasLocation;
+
+                    const qualVal = qualInput ? qualInput.value.trim() : '';
+                    const instVal = instInput ? instInput.value.trim() : '';
+                    const educationComplete = Boolean(qualVal && instVal);
+
+                    let skillCount = 0;
+                    if (skillProfileFields) {
+                        skillProfileFields.querySelectorAll('input[name="skillName"]').forEach(input => {
+                            if (input.value && input.value.trim()) skillCount++;
+                        });
+                    }
+                    const skillsComplete = skillCount > 0;
+
+                    const hasUploadedResume = initialCandidateState.hasResume || Boolean(resumeInput && resumeInput.files && resumeInput.files.length > 0);
+                    const resumeComplete = hasUploadedResume;
+
+                    const projectsComplete = initialCandidateState.projectsCount > 0;
+                    const certsComplete = initialCandidateState.certificationsCount > 0;
+
+                    const ruleStatuses = [
+                        { id: 'contactInfo', label: 'Contact & Location', weight: 15, category: 'required', completed: contactComplete, actionTarget: 'openModalBtn', actionType: 'modal', actionText: 'Update Location' },
+                        { id: 'education', label: 'Education Details', weight: 20, category: 'required', completed: educationComplete, actionTarget: 'openModalBtn', actionType: 'modal', actionText: 'Add Education' },
+                        { id: 'skills', label: 'Skills & Proficiencies', weight: 20, category: 'required', completed: skillsComplete, actionTarget: 'openModalBtn', actionType: 'modal', actionText: 'Add Skills' },
+                        { id: 'resume', label: 'Resume Upload', weight: 20, category: 'required', completed: resumeComplete, actionTarget: 'resumeUploadCard', actionType: 'scroll', actionText: 'Upload Resume' },
+                        { id: 'projects', label: 'Projects & Portfolio', weight: 15, category: 'recommended', completed: projectsComplete, actionTarget: 'projectModal', actionType: 'entryModal', actionText: 'Add Project' },
+                        { id: 'certifications', label: 'Certifications & Credentials', weight: 10, category: 'recommended', completed: certsComplete, actionTarget: 'certModal', actionType: 'entryModal', actionText: 'Add Certificate' }
+                    ];
+
+                    let earnedWeight = 0;
+                    let completedItemsCount = 0;
+                    const missingItems = [];
+
+                    ruleStatuses.forEach(rule => {
+                        if (rule.completed) {
+                            earnedWeight += rule.weight;
+                            completedItemsCount++;
+                        } else {
+                            missingItems.push(rule);
+                        }
+
+                        const itemRow = document.querySelector(`[data-completion-item-id="${rule.id}"]`);
+                        if (itemRow) {
+                            const iconWrapper = itemRow.querySelector('[data-completion-icon-wrapper]');
+                            const rightContainer = itemRow.children[1];
+
+                            if (rule.completed) {
+                                itemRow.className = 'flex items-start justify-between gap-3 p-2.5 rounded-xl border transition-all text-xs bg-emerald-50/40 border-emerald-100';
+                                if (iconWrapper) {
+                                    iconWrapper.className = 'w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-emerald-100 text-emerald-700';
+                                    iconWrapper.innerHTML = '<i class="ph-bold ph-check text-[11px]"></i>';
+                                }
+                                if (rightContainer) {
+                                    rightContainer.innerHTML = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="ph-bold ph-check"></i> +${rule.weight}%</span>`;
+                                }
+                            } else {
+                                itemRow.className = 'flex items-start justify-between gap-3 p-2.5 rounded-xl border transition-all text-xs bg-slate-50/70 border-slate-200';
+                                if (iconWrapper) {
+                                    iconWrapper.className = 'w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-slate-200 text-slate-400';
+                                    iconWrapper.innerHTML = '<i class="ph-bold ph-circle text-[11px]"></i>';
+                                }
+                                if (rightContainer) {
+                                    rightContainer.innerHTML = `<button type="button" data-completion-action="${rule.id}" data-action-target="${rule.actionTarget}" data-action-type="${rule.actionType}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white hover:bg-indigo-50 text-indigo-700 border border-slate-200 hover:border-indigo-300 transition-colors shadow-2xs cursor-pointer"><span>${rule.actionText}</span> <i class="ph-bold ph-arrow-right text-[10px]"></i></button>`;
+                                    const newBtn = rightContainer.querySelector('button');
+                                    if (newBtn) {
+                                        newBtn.addEventListener('click', () => handleCompletionAction(rule.actionType, rule.actionTarget));
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    const percentage = Math.min(100, Math.max(0, earnedWeight));
+
+                    profileProgressBar.style.width = percentage + '%';
+                    if (profileProgressPercent) profileProgressPercent.textContent = percentage + '%';
+                    if (profileScoreFraction) profileScoreFraction.textContent = `${earnedWeight} / 100 pts`;
+                    if (headerCompletionText) headerCompletionText.textContent = `Profile: ${percentage}%`;
+                    if (profileCompletedCount) profileCompletedCount.textContent = `${completedItemsCount} of 6 completed`;
+
+                    // Tier styling
+                    let tier = {
+                        label: 'Getting Started',
+                        icon: 'ph-warning-circle',
+                        badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+                        barBg: 'bg-rose-500'
+                    };
+                    if (percentage >= 100) {
+                        tier = {
+                            label: 'All-Star Profile',
+                            icon: 'ph-check-circle',
+                            badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                            barBg: 'bg-emerald-500'
+                        };
+                    } else if (percentage >= 80) {
+                        tier = {
+                            label: 'Strong Profile',
+                            icon: 'ph-sparkle',
+                            badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                            barBg: 'bg-indigo-600'
+                        };
+                    } else if (percentage >= 50) {
+                        tier = {
+                            label: 'Intermediate',
+                            icon: 'ph-trend-up',
+                            badgeBg: 'bg-amber-50 text-amber-800 border-amber-200',
+                            barBg: 'bg-amber-500'
+                        };
+                    }
+
+                    profileProgressBar.className = `h-full rounded-full transition-all duration-500 ${tier.barBg}`;
+                    if (profileLevelLabel) profileLevelLabel.textContent = tier.label;
+                    if (profileLevelBadge) profileLevelBadge.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${tier.badgeBg} shadow-2xs`;
+                    if (profileLevelIcon) profileLevelIcon.className = `ph-bold ${tier.icon}`;
+                    if (headerCompletionBadge) headerCompletionBadge.className = `inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${tier.badgeBg} shadow-xs hover:opacity-90 transition-all cursor-pointer`;
+                    if (headerCompletionIcon) headerCompletionIcon.className = `ph-bold ${tier.icon}`;
+
+                    // Update summary & next action
+                    if (percentage === 100) {
+                        if (profileSummaryText) profileSummaryText.textContent = 'Your profile is 100% complete and fully optimized for recruiters!';
+                        if (profileNextActionCard) profileNextActionCard.classList.add('hidden');
+                    } else {
+                        const requiredMissing = missingItems.filter(i => i.category === 'required');
+                        if (profileSummaryText) {
+                            if (requiredMissing.length > 0) {
+                                profileSummaryText.textContent = `${requiredMissing.length} essential item${requiredMissing.length === 1 ? '' : 's'} remaining to complete your profile.`;
+                            } else {
+                                profileSummaryText.textContent = `All essential fields completed! Add ${missingItems.length} recommended item${missingItems.length === 1 ? '' : 's'} to stand out.`;
+                            }
+                        }
+
+                        if (profileNextActionCard && missingItems.length > 0) {
+                            profileNextActionCard.classList.remove('hidden');
+                            missingItems.sort((a, b) => {
+                                if (a.category === 'required' && b.category !== 'required') return -1;
+                                if (b.category === 'required' && a.category !== 'required') return 1;
+                                return b.weight - a.weight;
+                            });
+                            const topMissing = missingItems[0];
+                            if (profileNextActionPrompt) {
+                                profileNextActionPrompt.textContent = `Complete "${topMissing.label}" (+${topMissing.weight}%) to boost your profile strength!`;
+                            }
+                            if (profileNextActionBtn && profileNextActionBtnText) {
+                                profileNextActionBtn.dataset.actionTarget = topMissing.actionTarget;
+                                profileNextActionBtn.dataset.actionType = topMissing.actionType;
+                                profileNextActionBtnText.textContent = topMissing.actionText;
+                            }
+                        }
+                    }
+                };
+
+                // Attach live recalculation listeners to modal inputs and events
+                const profileLocationInput = document.querySelector('input[name="location"]');
+                const profileInstitutionInput = document.querySelector('input[name="institution"]');
+                [profileLocationInput, editQualificationInput, profileInstitutionInput].forEach(inp => {
+                    if (inp) {
+                        inp.addEventListener('input', updateLiveProfileCompletion);
+                        inp.addEventListener('change', updateLiveProfileCompletion);
+                    }
+                });
+
+                if (skillProfileFields) {
+                    skillProfileFields.addEventListener('input', updateLiveProfileCompletion);
+                    skillProfileFields.addEventListener('change', updateLiveProfileCompletion);
+                }
+                if (addSkillProfileBtn) {
+                    addSkillProfileBtn.addEventListener('click', () => {
+                        setTimeout(updateLiveProfileCompletion, 50);
+                    });
+                }
+                if (resumeInput) {
+                    resumeInput.addEventListener('change', updateLiveProfileCompletion);
+                }
+                if (clearFileBtn) {
+                    clearFileBtn.addEventListener('click', () => {
+                        setTimeout(updateLiveProfileCompletion, 50);
                     });
                 }
             });

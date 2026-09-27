@@ -164,6 +164,8 @@ const sendStatusUpdateEmail = async (email, candidateName, internshipTitle, stat
     const statusColors = {
         'Under Review': '#d97706',
         'Shortlisted': '#059669',
+        'Interview': '#7c3aed',
+        'Hired': '#10b981',
         'Rejected': '#dc2626',
         'Submitted': '#4f46e5'
     };

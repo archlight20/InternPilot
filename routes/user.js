@@ -23,6 +23,7 @@ const { formatRelativeTime, formatLocalizedDateTime } = require('../utils/dateFo
 const { buildSkillProfiles, parseSkillProfiles, skillNames } = require('../utils/skillProfiles');
 const { sanitizeHttpUrl } = require('../utils/safeUrl');
 const { filterAndSortApplications } = require('../utils/applicationSearch');
+const { calculateProfileCompletion } = require('../utils/profileCompletion');
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -255,7 +256,8 @@ router.get('/candidate/profile', isAuthenticated, authorize('candidate'), async 
         res.render('candidate/candidate-profile', {
             user: freshUser,
             candidate: freshUser,
-            skillProfiles: buildSkillProfiles(freshUser)
+            skillProfiles: buildSkillProfiles(freshUser),
+            profileCompletion: calculateProfileCompletion(freshUser)
         });
     } catch (error) {
         console.error('Error fetching candidate profile:', error);
@@ -477,7 +479,8 @@ router.post('/candidate/parse-resume', isAuthenticated, authorize('candidate'), 
                 resumeOriginalName,
                 resumeVersionLabel,
                 resumeQuality,
-                showConflictModal: true
+                showConflictModal: true,
+                profileCompletion: calculateProfileCompletion(existingProfile)
             });
         }
 

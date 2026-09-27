@@ -108,7 +108,19 @@ router.post('/register', async (req, res) => {
         };
 
         if (userData.role === 'company') {
-            userData.companyDetails = { companyName, cin, industry };
+            userData.companyDetails = {
+                companyName,
+                cin,
+                industry,
+                isVerified: false,
+                verificationStatus: 'pending',
+                verificationSubmittedAt: new Date(),
+                verificationHistory: [{
+                    status: 'pending',
+                    reason: 'Company account registered.',
+                    changedAt: new Date()
+                }]
+            };
         }
 
         // Create pending user record before dispatching email to guarantee persistence

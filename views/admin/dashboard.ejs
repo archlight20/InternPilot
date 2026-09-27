@@ -13,7 +13,13 @@
                 class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
                 System Operational
             </span>
+            <a href="/admin/console" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">Admin Console</a>
         </div>
+
+        <a href="/admin/overview" id="adminConsoleLink" class="flex flex-wrap items-center justify-between gap-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-6 py-4 shadow-sm transition-colors">
+            <span><span class="block font-bold">Admin console</span><span class="block text-xs text-indigo-100">Analytics, users, listing moderation, applications, announcements and the audit log</span></span>
+            <span class="inline-flex items-center gap-1 text-sm font-semibold">Open <i class="ph-bold ph-arrow-right" aria-hidden="true"></i></span>
+        </a>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -54,6 +60,7 @@
                                 <th class="py-3 px-6">Email</th>
                                 <th class="py-3 px-6">CIN</th>
                                 <th class="py-3 px-6">Industry</th>
+                                <th class="py-3 px-6">Documents</th>
                                 <th class="py-3 px-6 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -75,7 +82,23 @@
                                         <%= (comp.companyDetails && comp.companyDetails.industry) ?
                                             comp.companyDetails.industry : 'N/A' %>
                                     </td>
-                                    <td class="py-4 px-6 text-right flex justify-end gap-2">
+                                    <td class="py-4 px-6 text-gray-600 text-xs">
+                                        <% const documents = comp.companyDetails && Array.isArray(comp.companyDetails.verificationDocuments) ? comp.companyDetails.verificationDocuments : []; %>
+                                        <% if (documents.length) { %>
+                                            <div class="flex flex-col gap-1">
+                                                <% documents.forEach(document => { %>
+                                                    <a href="<%= document.fileUrl %>" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline"><%= document.fileName %></a>
+                                                <% }) %>
+                                            </div>
+                                        <% } else { %>
+                                            <span>No documents submitted</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="py-4 px-6 text-right">
+                                        <% if (comp.companyDetails && comp.companyDetails.verificationReason) { %>
+                                            <p class="mb-2 max-w-xs text-left text-xs text-amber-700"><%= comp.companyDetails.verificationReason %></p>
+                                        <% } %>
+                                        <div class="flex flex-col items-end gap-2">
                                         <form action="/admin/approve-company/<%= comp._id %>" method="POST"
                                             class="inline">
                                             <button type="submit"
@@ -84,13 +107,16 @@
                                             </button>
                                         </form>
                                         <form action="/admin/reject-company/<%= comp._id %>" method="POST"
-                                            class="inline"
+                                            class="flex items-center justify-end gap-2"
                                             onsubmit="return confirm('Are you sure you want to reject this company?');">
+                                            <input type="text" name="reason" required maxlength="1000" placeholder="Reason for rejection"
+                                                class="w-40 rounded border border-gray-300 px-2 py-1 text-xs" />
                                             <button type="submit"
                                                 class="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition">
                                                 Reject
                                             </button>
                                         </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 <% }) %>
@@ -102,6 +128,44 @@
                         No pending company verifications!
                     </div>
                     <% } %>
+        </div>
+
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">Approved Companies</h2>
+                <p class="mt-1 text-sm text-gray-500">Suspending a company immediately closes its published and paused listings.</p>
+            </div>
+            <% if (approvedCompanies && approvedCompanies.length > 0) { %>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase">
+                                <th class="py-3 px-6">Company Name</th>
+                                <th class="py-3 px-6">Email</th>
+                                <th class="py-3 px-6">Approved</th>
+                                <th class="py-3 px-6 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-sm">
+                            <% approvedCompanies.forEach(comp => { %>
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="py-4 px-6 font-semibold text-gray-800"><%= comp.companyDetails?.companyName || comp.name %></td>
+                                    <td class="py-4 px-6 text-gray-600"><%= comp.email %></td>
+                                    <td class="py-4 px-6 text-gray-600"><%= comp.companyDetails?.verificationReviewedAt ? new Date(comp.companyDetails.verificationReviewedAt).toLocaleDateString('en-IN') : 'Legacy approval' %></td>
+                                    <td class="py-4 px-6 text-right">
+                                        <form action="/admin/suspend-company/<%= comp._id %>" method="POST" class="flex items-center justify-end gap-2" onsubmit="return confirm('Suspend this company and close its listings?');">
+                                            <input type="text" name="reason" required maxlength="1000" placeholder="Reason for suspension" class="w-40 rounded border border-gray-300 px-2 py-1 text-xs" />
+                                            <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition">Suspend</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="p-6 text-center text-gray-500">No approved companies yet.</div>
+            <% } %>
         </div>
 
         <div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
