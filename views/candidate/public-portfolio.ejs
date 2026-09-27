@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= portfolio.name %> — Verified Candidate Portfolio | InternPilot</title>
+    <meta name="description" content="Explore <%= portfolio.name %>'s verified internship credentials, skills, projects, and achievements on InternPilot.">
+    
+    <!-- OpenGraph / Social Metadata -->
+    <meta property="og:title" content="<%= portfolio.name %> — Verified Portfolio">
+    <meta property="og:description" content="<%= portfolio.headline %> • Verified skills and internship credentials on InternPilot">
+    <meta property="og:type" content="profile">
+    <meta property="og:url" content="<%= portfolio.portfolioUrl %>">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* Print Stylesheet for Clean PDF Resume Output */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .print-card {
+                box-shadow: none !important;
+                border: 1px solid #e2e8f0 !important;
+                page-break-inside: avoid;
+            }
+            .print-shadow-none {
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+    <!-- Top Tricolor Border Line (National Emblem / Official Portal Styling) -->
+    <div class="h-1.5 w-full bg-gradient-to-r from-orange-500 via-white to-emerald-600 no-print"></div>
+
+    <!-- Minimal Official Header Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs no-print">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="/" class="flex items-center gap-2 group">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm group-hover:bg-indigo-700 transition-colors">
+                        IP
+                    </div>
+                    <div>
+                        <span class="font-extrabold text-base tracking-tight text-slate-900">Intern<span class="text-indigo-600">Pilot</span></span>
+                        <span class="hidden sm:inline-block ml-2 text-[10px] font-semibold tracking-wider text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">Public Portfolio</span>
+                    </div>
+                </a>
+            </div>
+
+            <div class="flex items-center gap-2.5">
+                <button type="button" onclick="openShareModal()"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors shadow-2xs">
+                    <i class="ph-bold ph-share-network text-sm text-indigo-600"></i>
+                    <span class="hidden sm:inline">Share</span>
+                </button>
+
+                <button type="button" onclick="window.print()"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-200 transition-colors shadow-2xs">
+                    <i class="ph-bold ph-printer text-sm"></i>
+                    <span class="hidden sm:inline">Print / Save PDF</span>
+                </button>
+
+                <% if (currentUser) { %>
+                    <% if (currentUser.role === 'candidate') { %>
+                        <a href="/candidate/profile"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors shadow-2xs">
+                            <i class="ph-bold ph-user text-sm"></i>
+                            <span>My Dashboard</span>
+                        </a>
+                    <% } else if (currentUser.role === 'company') { %>
+                        <a href="/company/dashboard"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors shadow-2xs">
+                            <i class="ph-bold ph-buildings text-sm"></i>
+                            <span>Employer Desk</span>
+                        </a>
+                    <% } %>
+                <% } else { %>
+                    <a href="/auth/login"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-2xs">
+                        <i class="ph-bold ph-sign-in text-sm"></i>
+                        <span>Sign In</span>
+                    </a>
+                <% } %>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- HERO SECTION CARD -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden print-card">
+            <!-- Decorative Accent Gradient Banner -->
+            <div class="h-28 sm:h-32 bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800 relative">
+                <div class="absolute inset-0 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] opacity-10"></div>
+                
+                <!-- Visibility Pill Top Right -->
+                <div class="absolute top-4 right-4 no-print">
+                    <% if (portfolio.visibility === 'public') { %>
+                        <span class="inline-flex items-center gap-1 bg-white/90 backdrop-blur-xs text-emerald-800 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-200 shadow-xs">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Public Profile
+                        </span>
+                    <% } else if (portfolio.visibility === 'recruiters') { %>
+                        <span class="inline-flex items-center gap-1 bg-white/90 backdrop-blur-xs text-indigo-800 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-indigo-200 shadow-xs">
+                            <i class="ph-bold ph-buildings text-xs"></i>
+                            Verified Employers Only
+                        </span>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Profile Info Wrapper -->
+            <div class="px-6 sm:px-8 pb-8 pt-0 relative">
+                <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-14 mb-6">
+                    <!-- Avatar / Initials -->
+                    <div class="flex items-end gap-4">
+                        <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-extrabold text-3xl sm:text-4xl flex items-center justify-center border-4 border-white shadow-md shrink-0">
+                            <%= portfolio.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() %>
+                        </div>
+                        <div class="pt-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                                    <%= portfolio.name %>
+                                </h1>
+                                <% if (portfolio.isPmisVerified) { %>
+                                    <span class="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs"
+                                        title="Identity and eligibility verified by InternPilot under PMIS framework">
+                                        <i class="ph-bold ph-seal-check text-emerald-600 text-sm"></i>
+                                        PMIS Verified
+                                    </span>
+                                <% } %>
+                                <% if (portfolio.verifiedCertificates.length > 0) { %>
+                                    <span class="inline-flex items-center gap-1 text-[11px] font-bold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs">
+                                        <i class="ph-bold ph-certificate text-indigo-600 text-sm"></i>
+                                        <%= portfolio.verifiedCertificates.length %> Verified <%= portfolio.verifiedCertificates.length === 1 ? 'Credential' : 'Credentials' %>
+                                    </span>
+                                <% } %>
+                            </div>
+                            <p class="text-sm sm:text-base font-semibold text-slate-600 mt-1">
+                                <%= portfolio.headline %>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Recruiter Quick Action / Owner Edit -->
+                    <div class="flex items-center gap-2 shrink-0 pt-2 no-print">
+                        <% if (portfolio.isOwner) { %>
+                            <a href="/candidate/profile"
+                                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors shadow-2xs">
+                                <i class="ph-bold ph-pencil-simple text-sm"></i>
+                                Edit Profile
+                            </a>
+                        <% } else if (portfolio.isEmployer) { %>
+                            <a href="/messages"
+                                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors shadow-2xs">
+                                <i class="ph-bold ph-chat-circle text-sm"></i>
+                                Message Candidate
+                            </a>
+                        <% } %>
+                    </div>
+                </div>
+
+                <!-- Meta Details Strip -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 py-4 border-t border-b border-slate-100 text-xs text-slate-600">
+                    <!-- Location -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                            <i class="ph-bold ph-map-pin"></i>
+                        </div>
+                        <div class="truncate">
+                            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Location</span>
+                            <span class="font-medium text-slate-800"><%= portfolio.location %></span>
+                        </div>
+                    </div>
+
+                    <!-- Education / Institution -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                            <i class="ph-bold ph-graduation-cap"></i>
+                        </div>
+                        <div class="truncate">
+                            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Institution</span>
+                            <span class="font-medium text-slate-800" title="<%= portfolio.institution || 'Not specified' %>">
+                                <%= portfolio.institution || 'Higher Education' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Degree / Qualification -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                            <i class="ph-bold ph-book-open"></i>
+                        </div>
+                        <div class="truncate">
+                            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Qualification</span>
+                            <span class="font-medium text-slate-800">
+                                <%= portfolio.qualification || 'Student / Graduate' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Contact Status -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                            <i class="ph-bold ph-envelope"></i>
+                        </div>
+                        <div class="truncate">
+                            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Contact</span>
+                            <% if (portfolio.email) { %>
+                                <a href="mailto:<%= portfolio.email %>" class="font-medium text-indigo-600 hover:underline">
+                                    <%= portfolio.email %>
+                                </a>
+                            <% } else { %>
+                                <span class="font-medium text-slate-400 italic" title="Contact info hidden for privacy">Protected for Privacy</span>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Social & Professional Web Links -->
+                <% const hasSocial = portfolio.social.github || portfolio.social.linkedin || portfolio.social.twitter || portfolio.social.website; %>
+                <% if (hasSocial) { %>
+                    <div class="flex flex-wrap items-center gap-2.5 mt-4 pt-1">
+                        <% if (portfolio.social.github) { %>
+                            <a href="<%= portfolio.social.github %>" target="_blank" rel="noopener noreferrer"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors">
+                                <i class="ph-bold ph-github-logo text-sm"></i>
+                                GitHub
+                            </a>
+                        <% } %>
+                        <% if (portfolio.social.linkedin) { %>
+                            <a href="<%= portfolio.social.linkedin %>" target="_blank" rel="noopener noreferrer"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors">
+                                <i class="ph-bold ph-linkedin-logo text-sm"></i>
+                                LinkedIn
+                            </a>
+                        <% } %>
+                        <% if (portfolio.social.twitter) { %>
+                            <a href="<%= portfolio.social.twitter %>" target="_blank" rel="noopener noreferrer"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-semibold transition-colors">
+                                <i class="ph-bold ph-x-logo text-sm"></i>
+                                Twitter / X
+                            </a>
+                        <% } %>
+                        <% if (portfolio.social.website) { %>
+                            <a href="<%= portfolio.social.website %>" target="_blank" rel="noopener noreferrer"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors">
+                                <i class="ph-bold ph-globe text-sm"></i>
+                                Personal Site
+                            </a>
+                        <% } %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- MAIN GRID: 2 COLUMNS (CONTENT + SIDEBAR) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- LEFT 2 COLUMNS: CREDENTIALS, PROJECTS & BIO -->
+            <div class="lg:col-span-2 space-y-8">
+                
+                <!-- ABOUT / BIO SECTION -->
+                <% if (portfolio.bio) { %>
+                    <section class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs print-card">
+                        <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                            <i class="ph-bold ph-user-circle text-indigo-600 text-xl"></i>
+                            <h2 class="text-base font-bold text-slate-900">About Candidate</h2>
+                        </div>
+                        <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                            <%= portfolio.bio %>
+                        </p>
+                    </section>
+                <% } %>
+
+                <!-- VERIFIED INTERNSHIP CERTIFICATES (OFFICIAL CREDENTIALS) -->
+                <% if (portfolio.verifiedCertificates.length > 0) { %>
+                    <section class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs print-card">
+                        <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
+                            <div class="flex items-center gap-2">
+                                <i class="ph-bold ph-certificate text-indigo-600 text-xl"></i>
+                                <h2 class="text-base font-bold text-slate-900">Official Internship Certificates</h2>
+                            </div>
+                            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                                Tamper-Evident Verified
+                            </span>
+                        </div>
+
+                        <div class="space-y-4">
+                            <% portfolio.verifiedCertificates.forEach(cert => { %>
+                                <div class="bg-gradient-to-r from-slate-50 to-indigo-50/30 rounded-xl p-4 sm:p-5 border border-slate-200/80 hover:border-indigo-300 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div class="space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="font-bold text-slate-900 text-sm sm:text-base"><%= cert.internshipTitle %></h3>
+                                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                <i class="ph-bold ph-check-circle"></i> Issued
+                                            </span>
+                                        </div>
+                                        <p class="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                                            <i class="ph-bold ph-buildings text-indigo-600"></i>
+                                            <span><%= cert.companyName %></span>
+                                            <% if (cert.duration) { %>
+                                                <span class="text-slate-300">•</span>
+                                                <span><%= cert.duration %></span>
+                                            <% } %>
+                                        </p>
+                                        <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                                            <span>ID: <%= cert.certificateId %></span>
+                                            <% if (cert.issuedAt) { %>
+                                                <span>•</span>
+                                                <span>Issued: <%= cert.issuedAt %></span>
+                                            <% } %>
+                                        </div>
+                                    </div>
+
+                                    <div class="shrink-0 no-print">
+                                        <a href="<%= cert.verificationUrl %>" target="_blank"
+                                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-200 transition-colors shadow-2xs">
+                                            <i class="ph-bold ph-shield-check text-sm text-indigo-600"></i>
+                                            <span>Verify Certificate</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        </div>
+                    </section>
+                <% } %>
+
+                <!-- FEATURED PROJECTS SECTION -->
+                <section class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs print-card">
+                    <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <i class="ph-bold ph-folder-open text-indigo-600 text-xl"></i>
+                            <h2 class="text-base font-bold text-slate-900">Featured Projects</h2>
+                        </div>
+                        <span class="text-xs text-slate-400 font-semibold"><%= portfolio.projects.length %> <%= portfolio.projects.length === 1 ? 'Project' : 'Projects' %></span>
+                    </div>
+
+                    <% if (portfolio.projects.length === 0) { %>
+                        <div class="text-center py-8 text-slate-400 text-xs">
+                            <i class="ph-bold ph-folder-dashed text-3xl mb-2 block text-slate-300"></i>
+                            No projects highlighted yet.
+                        </div>
+                    <% } else { %>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <% portfolio.projects.forEach(project => { %>
+                                <div class="bg-slate-50/60 rounded-xl p-4 border border-slate-200/90 flex flex-col justify-between hover:bg-slate-50 transition-colors">
+                                    <div class="space-y-2">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <h3 class="font-bold text-slate-900 text-sm leading-snug"><%= project.title %></h3>
+                                            <% if (project.link) { %>
+                                                <a href="<%= project.link %>" target="_blank" rel="noopener noreferrer"
+                                                    class="text-indigo-600 hover:text-indigo-700 text-sm shrink-0" title="Visit Project">
+                                                    <i class="ph-bold ph-arrow-square-out"></i>
+                                                </a>
+                                            <% } %>
+                                        </div>
+                                        
+                                        <% if (project.description) { %>
+                                            <p class="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                                                <%= project.description %>
+                                            </p>
+                                        <% } %>
+                                    </div>
+
+                                    <% if (project.techStack.length > 0) { %>
+                                        <div class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-200/60">
+                                            <% project.techStack.forEach(tech => { %>
+                                                <span class="text-[10px] font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs font-mono">
+                                                    <%= tech %>
+                                                </span>
+                                            <% }); %>
+                                        </div>
+                                    <% } %>
+                                </div>
+                            <% }); %>
+                        </div>
+                    <% } %>
+                </section>
+
+                <!-- EXTERNAL CERTIFICATIONS -->
+                <% if (portfolio.certifications.length > 0) { %>
+                    <section class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs print-card">
+                        <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                            <i class="ph-bold ph-medal text-indigo-600 text-xl"></i>
+                            <h2 class="text-base font-bold text-slate-900">Certifications & Licenses</h2>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <% portfolio.certifications.forEach(cert => { %>
+                                <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                        <i class="ph-bold ph-award text-base"></i>
+                                    </div>
+                                    <div class="space-y-0.5 truncate">
+                                        <h4 class="font-bold text-slate-800 text-xs truncate"><%= cert.name %></h4>
+                                        <p class="text-[11px] text-slate-500 truncate"><%= cert.issuer || 'Self-Reported Credential' %></p>
+                                        <% if (cert.issueDate) { %>
+                                            <p class="text-[10px] text-slate-400 font-mono">Issued: <%= cert.issueDate %></p>
+                                        <% } %>
+                                        <% if (cert.link) { %>
+                                            <a href="<%= cert.link %>" target="_blank" rel="noopener noreferrer" class="text-[11px] font-semibold text-indigo-600 hover:underline inline-flex items-center gap-0.5 pt-0.5">
+                                                <span>View Credential</span>
+                                                <i class="ph-bold ph-arrow-up-right text-[10px]"></i>
+                                            </a>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        </div>
+                    </section>
+                <% } %>
+            </div>
+
+            <!-- RIGHT 1 COLUMN: SKILLS, EDUCATION & ACTIONS -->
+            <div class="space-y-8">
+
+                <!-- TECHNICAL SKILLS MATRIX -->
+                <section class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs print-card">
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <i class="ph-bold ph-code text-indigo-600 text-xl"></i>
+                            <h2 class="text-base font-bold text-slate-900">Technical Skills</h2>
+                        </div>
+                        <span class="text-xs text-slate-400 font-semibold"><%= portfolio.totalSkillsCount %></span>
+                    </div>
+
+                    <% if (portfolio.totalSkillsCount === 0) { %>
+                        <p class="text-xs text-slate-400 py-3 text-center">No skills listed yet.</p>
+                    <% } else { %>
+                        <div class="space-y-4">
+                            <!-- Advanced Skills -->
+                            <% if (portfolio.skillsByLevel.Advanced.length > 0) { %>
+                                <div>
+                                    <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                        <span>Advanced Proficiency</span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <% portfolio.skillsByLevel.Advanced.forEach(skill => { %>
+                                            <span class="text-xs font-semibold text-emerald-800 bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs font-mono">
+                                                <%= skill %>
+                                            </span>
+                                        <% }); %>
+                                    </div>
+                                </div>
+                            <% } %>
+
+                            <!-- Intermediate Skills -->
+                            <% if (portfolio.skillsByLevel.Intermediate.length > 0) { %>
+                                <div>
+                                    <div class="flex items-center gap-1.5 text-xs font-bold text-indigo-800 uppercase tracking-wider mb-2">
+                                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                        <span>Intermediate</span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <% portfolio.skillsByLevel.Intermediate.forEach(skill => { %>
+                                            <span class="text-xs font-semibold text-indigo-800 bg-indigo-50/80 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs font-mono">
+                                                <%= skill %>
+                                            </span>
+                                        <% }); %>
+                                    </div>
+                                </div>
+                            <% } %>
+
+                            <!-- Beginner Skills -->
+                            <% if (portfolio.skillsByLevel.Beginner.length > 0) { %>
+                                <div>
+                                    <div class="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-wider mb-2">
+                                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                        <span>Familiar / Developing</span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <% portfolio.skillsByLevel.Beginner.forEach(skill => { %>
+                                            <span class="text-xs font-semibold text-amber-800 bg-amber-50/80 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs font-mono">
+                                                <%= skill %>
+                                            </span>
+                                        <% }); %>
+                                    </div>
+                                </div>
+                            <% } %>
+                        </div>
+                    <% } %>
+                </section>
+
+                <!-- EDUCATION & ACADEMIC BACKGROUND -->
+                <section class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs print-card">
+                    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                        <i class="ph-bold ph-graduation-cap text-indigo-600 text-xl"></i>
+                        <h2 class="text-base font-bold text-slate-900">Education</h2>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 block">Degree & Major</span>
+                            <h4 class="font-bold text-slate-900 text-sm"><%= portfolio.qualification || 'Higher Education Degree' %></h4>
+                            <p class="text-xs text-slate-600 flex items-center gap-1.5 pt-0.5">
+                                <i class="ph-bold ph-buildings text-slate-400"></i>
+                                <span><%= portfolio.institution || 'Recognized University / Institution' %></span>
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VERIFICATION & TRUST BADGE CARD -->
+                <section class="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-6 shadow-sm no-print space-y-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400 text-xl">
+                            <i class="ph-bold ph-shield-check"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-sm text-white">Authentic Credentials</h3>
+                            <p class="text-[11px] text-slate-300">Verified by InternPilot</p>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Internships completed and credentials listed on this portfolio are verified through tamper-evident digital records and company sign-offs.
+                    </p>
+
+                    <div class="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Protected by InternPilot</span>
+                        <a href="/" class="text-indigo-300 hover:text-white font-semibold transition-colors">Learn More</a>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-400 no-print">
+        <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-700">InternPilot</span>
+                <span>• Official Student Internship Portal</span>
+            </div>
+            <div>
+                <span>Powered by Government PMIS & Enterprise Verifications</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- INTERACTIVE SHARE PORTFOLIO MODAL (POPOVER) -->
+    <div id="shareModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-base">
+                        <i class="ph-bold ph-share-network"></i>
+                    </div>
+                    <h3 class="font-bold text-base text-slate-900">Share Public Portfolio</h3>
+                </div>
+                <button type="button" onclick="closeShareModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500 leading-relaxed">
+                Share this verified portfolio with recruiters, on your resume, or on your social profiles.
+            </p>
+
+            <!-- Copy Link Box -->
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Portfolio Link</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="portfolioUrlInput" value="<%= portfolio.portfolioUrl %>" readonly
+                        class="flex-1 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 select-all outline-none focus:ring-2 focus:ring-indigo-500/20">
+                    <button type="button" id="copyLinkBtn" onclick="copyPortfolioLink()"
+                        class="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors shadow-2xs">
+                        <i class="ph-bold ph-copy text-sm"></i>
+                        <span id="copyBtnText">Copy</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 1-Click Social Share Buttons -->
+            <div class="space-y-2">
+                <label class="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">Share to Networks</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <a href="<%= portfolio.shareLinks.linkedin %>" target="_blank" rel="noopener noreferrer"
+                        class="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 transition-colors text-slate-700 hover:text-indigo-700">
+                        <i class="ph-bold ph-linkedin-logo text-xl text-[#0A66C2]"></i>
+                        <span class="text-[11px] font-bold mt-1">LinkedIn</span>
+                    </a>
+                    <a href="<%= portfolio.shareLinks.twitter %>" target="_blank" rel="noopener noreferrer"
+                        class="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-sky-50 hover:border-sky-200 transition-colors text-slate-700 hover:text-sky-700">
+                        <i class="ph-bold ph-x-logo text-xl text-slate-900"></i>
+                        <span class="text-[11px] font-bold mt-1">Twitter / X</span>
+                    </a>
+                    <a href="<%= portfolio.shareLinks.whatsapp %>" target="_blank" rel="noopener noreferrer"
+                        class="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 transition-colors text-slate-700 hover:text-emerald-700">
+                        <i class="ph-bold ph-whatsapp-logo text-xl text-[#25D366]"></i>
+                        <span class="text-[11px] font-bold mt-1">WhatsApp</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button type="button" onclick="closeShareModal()"
+                    class="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client-side Scripts for Share Modal and Link Copying -->
+    <script>
+        function openShareModal() {
+            const modal = document.getElementById('shareModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeShareModal() {
+            const modal = document.getElementById('shareModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        async function copyPortfolioLink() {
+            const input = document.getElementById('portfolioUrlInput');
+            const btnText = document.getElementById('copyBtnText');
+            if (!input) return;
+
+            try {
+                await navigator.clipboard.writeText(input.value);
+                if (btnText) {
+                    btnText.innerText = 'Copied!';
+                    setTimeout(() => {
+                        btnText.innerText = 'Copy';
+                    }, 2500);
+                }
+            } catch (err) {
+                input.select();
+                document.execCommand('copy');
+                if (btnText) {
+                    btnText.innerText = 'Copied!';
+                    setTimeout(() => {
+                        btnText.innerText = 'Copy';
+                    }, 2500);
+                }
+            }
+        }
+
+        // Close modal on Escape key press
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeShareModal();
+            }
+        });
+    </script>
+</body>
+
+</html>

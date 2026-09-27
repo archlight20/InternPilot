@@ -297,7 +297,15 @@ router.post('/candidate/profile/edit', isAuthenticated, authorize('candidate'), 
             qualification,
             institution,
             enrollmentStatus,
-            employmentStatus
+            employmentStatus,
+            portfolioVisibility,
+            portfolioContactVisible,
+            portfolioHeadline,
+            portfolioBio,
+            github,
+            linkedin,
+            twitter,
+            website
         } = req.body;
 
         const parsedSkillProfiles = parseSkillProfiles(req.body);
@@ -320,24 +328,43 @@ router.post('/candidate/profile/edit', isAuthenticated, authorize('candidate'), 
             ? Number(familyIncome)
             : null;
 
+        const updateSet = {
+            age: parsedAge,
+            familyIncome: parsedIncome,
+            institution: institution || '',
+            'education.institutionName': institution || '',
+            skills: skillsArray,
+            skillProfiles: parsedSkillProfiles,
+            'location.district': district,
+            'location.state': state,
+            'education.qualification': qualification || '',
+            qualification: qualification || '',
+            enrollmentStatus: (enrollmentStatus || '').trim(),
+            employmentStatus: (employmentStatus || '').trim()
+        };
+
+        if (['public', 'recruiters', 'private'].includes(portfolioVisibility)) {
+            updateSet.portfolioVisibility = portfolioVisibility;
+        }
+        if (portfolioContactVisible !== undefined) {
+            updateSet.portfolioContactVisible = portfolioContactVisible === 'true' || portfolioContactVisible === true || portfolioContactVisible === 'on';
+        }
+        if (portfolioHeadline !== undefined) {
+            updateSet.portfolioHeadline = String(portfolioHeadline).trim().slice(0, 200);
+        }
+        if (portfolioBio !== undefined) {
+            updateSet.portfolioBio = String(portfolioBio).trim().slice(0, 2000);
+        }
+        if (github !== undefined || linkedin !== undefined || twitter !== undefined || website !== undefined) {
+            updateSet['portfolioSocial.github'] = String(github || '').trim().slice(0, 300);
+            updateSet['portfolioSocial.linkedin'] = String(linkedin || '').trim().slice(0, 300);
+            updateSet['portfolioSocial.twitter'] = String(twitter || '').trim().slice(0, 300);
+            updateSet['portfolioSocial.website'] = String(website || '').trim().slice(0, 300);
+        }
+
         await User.findByIdAndUpdate(
             userId,
-            {
-                $set: {
-                    age: parsedAge,
-                    familyIncome: parsedIncome,
-                    institution: institution || '',
-                    'education.institutionName': institution || '',
-                    skills: skillsArray,
-                    skillProfiles: parsedSkillProfiles,
-                    'location.district': district,
-                    'location.state': state,
-                    'education.qualification': qualification || '',
-                    qualification: qualification || '',
-                    enrollmentStatus: (enrollmentStatus || '').trim(),
-                    employmentStatus: (employmentStatus || '').trim()
-                }
-            },
+            { $set: updateSet },
             { returnDocument: 'after', runValidators: false }
         );
 
