@@ -6,6 +6,24 @@
         rejected: 'border-rose-200 bg-rose-50 text-rose-800',
         suspended: 'border-rose-300 bg-rose-100 text-rose-900'
     };
+    const reviewActions = {
+        pending: [
+            { action: 'approve', label: 'Approve', placeholder: 'Reason for approval', buttonClass: 'bg-emerald-600 hover:bg-emerald-700' },
+            { action: 'reject', label: 'Reject', placeholder: 'Reason for rejection', buttonClass: 'bg-rose-600 hover:bg-rose-700' },
+            { action: 'suspend', label: 'Suspend', placeholder: 'Reason for suspension', buttonClass: 'bg-slate-800 hover:bg-slate-900' }
+        ],
+        approved: [
+            { action: 'suspend', label: 'Suspend', placeholder: 'Reason for suspension', buttonClass: 'bg-rose-600 hover:bg-rose-700' }
+        ],
+        rejected: [
+            { action: 'approve', label: 'Approve', placeholder: 'Reason for approval', buttonClass: 'bg-emerald-600 hover:bg-emerald-700' },
+            { action: 'suspend', label: 'Suspend', placeholder: 'Reason for suspension', buttonClass: 'bg-slate-800 hover:bg-slate-900' }
+        ],
+        suspended: [
+            { action: 'approve', label: 'Approve', placeholder: 'Reason for approval', buttonClass: 'bg-emerald-600 hover:bg-emerald-700' },
+            { action: 'reject', label: 'Reject', placeholder: 'Reason for rejection', buttonClass: 'bg-rose-600 hover:bg-rose-700' }
+        ]
+    };
 %>
 
 <div class="mx-auto max-w-7xl space-y-6 py-4">
@@ -41,29 +59,17 @@
                             <p class="mt-1 text-sm text-slate-600"><%= candidate.email || 'No email available' %></p>
                             <p class="mt-2 text-xs text-slate-500">Submitted <%= verification.submittedAt ? new Date(verification.submittedAt).toLocaleString('en-IN') : '—' %> · Masked identifier: <span class="font-bold text-slate-700"><%= verification.maskedIdentifier || 'Not supplied' %></span></p>
                         </div>
-                        <% if (verification.status === 'pending') { %>
+                        <% const actions = reviewActions[verification.status] || []; %>
+                        <% if (actions.length) { %>
                             <div class="min-w-72 rounded-xl border border-slate-200 bg-slate-50 p-3">
                                 <p class="text-xs font-bold text-slate-700">Decision reason (required)</p>
-                                <form action="/admin/candidate-verifications/<%= verification._id %>/approve" method="POST" class="mt-2 flex flex-wrap gap-2">
-                                    <input name="reason" required maxlength="1000" placeholder="Reason for approval" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
-                                    <button class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">Approve</button>
-                                </form>
-                                <form action="/admin/candidate-verifications/<%= verification._id %>/reject" method="POST" class="mt-2 flex flex-wrap gap-2">
-                                    <input name="reason" required maxlength="1000" placeholder="Reason for rejection" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
-                                    <button class="rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700">Reject</button>
-                                </form>
-                                <form action="/admin/candidate-verifications/<%= verification._id %>/suspend" method="POST" class="mt-2 flex flex-wrap gap-2">
-                                    <input name="reason" required maxlength="1000" placeholder="Reason for suspension" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
-                                    <button class="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-900">Suspend</button>
-                                </form>
+                                <% actions.forEach(({ action, label, placeholder, buttonClass }) => { %>
+                                    <form action="/admin/candidate-verifications/<%= verification._id %>/<%= action %>" method="POST" class="mt-2 flex flex-wrap gap-2">
+                                        <input name="reason" required maxlength="1000" placeholder="<%= placeholder %>" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
+                                        <button class="rounded-lg <%= buttonClass %> px-3 py-2 text-xs font-bold text-white"><%= label %></button>
+                                    </form>
+                                <% }) %>
                             </div>
-                        <% } else if (verification.status === 'approved') { %>
-                            <form action="/admin/candidate-verifications/<%= verification._id %>/suspend" method="POST" class="min-w-72 rounded-xl border border-rose-200 bg-rose-50 p-3">
-                                <label class="text-xs font-bold text-rose-900">Suspend verification
-                                    <input name="reason" required maxlength="1000" placeholder="Reason for suspension" class="mt-2 block w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs" />
-                                </label>
-                                <button class="mt-2 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700">Suspend</button>
-                            </form>
                         <% } %>
                     </div>
 

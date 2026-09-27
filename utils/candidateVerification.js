@@ -3,8 +3,8 @@ const CandidateVerification = require('../models/CandidateVerification');
 const VERIFICATION_STATUSES = ['pending', 'approved', 'rejected', 'suspended'];
 const REVIEW_STATUSES = ['approved', 'rejected', 'suspended'];
 
-// A candidate may submit fresh documents after a rejection or an approval.
-// Every other state change is a deliberate admin review decision.
+// A candidate may submit fresh documents after a rejection. Approved and
+// suspended records can only be changed through an accountable admin review.
 const REVIEW_TRANSITIONS = {
     pending: new Set(['approved', 'rejected', 'suspended']),
     approved: new Set(['suspended']),
@@ -86,6 +86,14 @@ function submitCandidateVerification(verification, { candidateId, documents, mas
     }
 
     const previousStatus = verificationStatus(verification);
+    if (!verification.isNew && ['approved', 'suspended'].includes(previousStatus)) {
+        throw new CandidateVerificationError(
+            `Documents cannot be resubmitted while verification is ${statusLabel(previousStatus)}.`,
+            'VERIFICATION_RESUBMISSION_BLOCKED',
+            409
+        );
+    }
+
     verification.candidate = candidateId || verification.candidate;
     verification.status = 'pending';
     verification.documents = documents;

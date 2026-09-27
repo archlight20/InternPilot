@@ -93,6 +93,32 @@ test('candidate document resubmission returns verification to pending and keeps 
     assert.equal(verification.history.at(-1).actorRole, 'candidate');
 });
 
+test('approved and suspended verifications cannot be resubmitted by a candidate', () => {
+    ['approved', 'suspended'].forEach(status => {
+        const verification = {
+            candidate: 'candidate-id',
+            status,
+            documents: [{ storageKey: 'existing-document' }],
+            history: [],
+            isNew: false
+        };
+
+        assert.throws(
+            () => submitCandidateVerification(verification, {
+                candidateId: 'candidate-id',
+                documents: [documentReference()],
+                maskedIdentifier: '•••• 1234'
+            }),
+            error => error instanceof CandidateVerificationError
+                && error.code === 'VERIFICATION_RESUBMISSION_BLOCKED'
+                && error.statusCode === 409
+        );
+        assert.equal(verification.status, status);
+        assert.equal(verification.history.length, 0);
+        assert.equal(verification.documents[0].storageKey, 'existing-document');
+    });
+});
+
 test('application and offer gates accept only approved candidate verification', async () => {
     const ApprovedModel = { async findOne() { return { status: 'approved' }; } };
     const PendingModel = { async findOne() { return { status: 'pending' }; } };
