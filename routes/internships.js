@@ -255,13 +255,20 @@ router.get('/:id', async (req, res) => {
 
         const isPaused = internship.status === 'paused' || internship.isPaused === true;
 
+        let reviewStats = null;
+        if (company && company._id) {
+            const { calculateCompanyReviewStats } = require('../utils/reviews');
+            reviewStats = await calculateCompanyReviewStats(company._id);
+        }
+
         res.render('extras/internship-detail', {
             internship,
             company,
             candidate,
             currentUser: req.user,
             hasApplied,
-            isPaused
+            isPaused,
+            reviewStats
         });
     } catch (error) {
         console.error('Error loading internship details:', error);

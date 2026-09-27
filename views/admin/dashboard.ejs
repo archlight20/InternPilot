@@ -135,7 +135,7 @@
                 <h2 class="text-xl font-bold text-gray-800">Approved Companies</h2>
                 <p class="mt-1 text-sm text-gray-500">Suspending a company immediately closes its published and paused listings.</p>
             </div>
-            <% if (approvedCompanies && approvedCompanies.length > 0) { %>
+            <% if (typeof approvedCompanies !== 'undefined' && approvedCompanies && approvedCompanies.length > 0) { %>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>

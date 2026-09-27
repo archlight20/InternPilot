@@ -31,7 +31,8 @@ const notificationSchema = new mongoose.Schema({
             'offer_issued',
             'offer_accepted',
             'offer_declined',
-            'offer_expired'
+            'offer_expired',
+            'certificate_issued'
         ],
         required: true
     },

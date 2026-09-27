@@ -21,7 +21,10 @@ const {
 } = require('../utils/adminConsole');
 
 function hasRoute(router, method, routePath) {
-    return router.stack.some(layer => layer.route && layer.route.path === routePath && layer.route.methods[method]);
+    return router.stack.some(layer => {
+        if (!layer.route || !layer.route.methods || !layer.route.methods[method]) return false;
+        return Array.isArray(layer.route.path) ? layer.route.path.includes(routePath) : layer.route.path === routePath;
+    });
 }
 
 test('console analytics helpers use supported ranges and calculate funnel conversion', () => {

@@ -104,7 +104,7 @@
                     </div>
                     <div>
                         <span class="text-slate-400 font-medium block mb-1">Application Status</span>
-                        <% const isReadOnlyStatus = ['Withdrawn', 'withdrawn', 'Interview', 'Hired', 'Offer Declined'].includes(application.status); %>
+                        <% const isReadOnlyStatus = ['Withdrawn', 'withdrawn', 'Hired', 'Offer Declined'].includes(application.status); %>
                         <% if (!isReadOnlyStatus && canReviewApplications) { %>
                             <form action="/company/applications/<%= application._id %>/status"
                                 method="POST" class="inline-block">
@@ -289,6 +289,73 @@
                             <p class="text-xs text-rose-500 italic">Cannot schedule an interview after a final application outcome.</p>
                         <% } else { %>
                             <p class="text-xs text-slate-500 italic">Interview scheduling is available to Admins and Recruiters.</p>
+                        <% } %>
+                    </div>
+                <% } %>
+            </div>
+
+            <!-- Certificate & LOR Card -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <h2 class="text-sm font-bold text-slate-800 flex items-center justify-between border-b border-slate-100 pb-3">
+                    <span class="flex items-center gap-2">
+                        <i class="ph-bold ph-certificate text-amber-500 text-lg"></i>
+                        Completion Credential
+                    </span>
+                    <% if (typeof certificate !== 'undefined' && certificate) { %>
+                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Issued
+                        </span>
+                    <% } else { %>
+                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            Pending
+                        </span>
+                    <% } %>
+                </h2>
+
+                <% if (typeof certificate !== 'undefined' && certificate) { %>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <span class="text-slate-400 font-medium block">Certificate ID</span>
+                            <span class="font-mono font-bold text-slate-800 tracking-wider text-xs bg-slate-100 px-2 py-1 rounded inline-block">
+                                <%= certificate.certificateId %>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-slate-400 font-medium block">Rating</span>
+                                <span class="font-bold text-amber-600"><%= certificate.performanceRating %></span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-medium block">Tenure</span>
+                                <span class="font-bold text-slate-700"><%= certificate.duration %></span>
+                            </div>
+                        </div>
+                        <% if (certificate.letterOfRecommendation) { %>
+                            <div class="flex items-center gap-1.5 text-indigo-700 font-semibold text-[11px] bg-indigo-50 p-2 rounded-lg border border-indigo-100">
+                                <i class="ph-bold ph-file-text text-sm"></i> Includes Letter of Recommendation
+                            </div>
+                        <% } %>
+                        <div class="pt-2">
+                            <a href="/certificates/<%= certificate.certificateId %>/view" target="_blank"
+                                class="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm">
+                                <i class="ph-bold ph-arrow-square-out text-sm"></i> View & Print Certificate
+                            </a>
+                        </div>
+                    </div>
+                <% } else { %>
+                    <div class="text-center py-2 space-y-2">
+                        <p class="text-xs text-slate-500">
+                            Issue an official Certificate of Completion and optional Letter of Recommendation with a tamper-proof verification ID.
+                        </p>
+                        <% if (canReviewApplications && !['Rejected', 'rejected', 'Withdrawn', 'withdrawn'].includes(application.status)) { %>
+                            <a href="/company/applications/<%= application._id %>/certificate/issue"
+                                class="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                                <i class="ph-bold ph-seal-check text-sm"></i> Issue Certificate & LOR
+                            </a>
+                        <% } else if (['Rejected', 'rejected', 'Withdrawn', 'withdrawn'].includes(application.status)) { %>
+                            <p class="text-xs text-slate-400 italic">Credentials cannot be issued for rejected or withdrawn candidates.</p>
+                        <% } else { %>
+                            <p class="text-xs text-slate-400 italic">Available to Recruiters & Admins.</p>
                         <% } %>
                     </div>
                 <% } %>

@@ -287,7 +287,17 @@
                                         Withdraw
                                     </button>
                                 <% } else { %>
-                                    <span data-action-state="unavailable" class="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">No actions available</span>
+                                    <% const compId = (internship && (internship.companyId || (internship.company && internship.company._id))) || app.company; %>
+                                    <% if (normalizedStatus === 'hired' && compId) { %>
+                                        <a href="/companies/<%= compId %>/reviews/new"
+                                            class="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition-colors hover:bg-amber-100 shadow-2xs"
+                                            title="Share your verified intern experience">
+                                            <i class="ph-bold ph-star text-amber-600"></i>
+                                            Write Review
+                                        </a>
+                                    <% } else { %>
+                                        <span data-action-state="unavailable" class="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">No actions available</span>
+                                    <% } %>
                                 <% } %>
 
                                 <% if (internship._id) { %>

@@ -8,12 +8,19 @@
             <i class="ph-bold ph-arrow-left"></i> Back to <%= cName %> Profile
         </a>
 
-        <% if (eligibility && eligibility.isEligible && !eligibility.existingReview) { %>
-            <a href="/companies/<%= company._id %>/reviews/new"
-                class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all">
-                <i class="ph-bold ph-pencil-simple text-sm"></i>
-                <span>Write a Verified Review</span>
-            </a>
+        <% if (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'candidate') { %>
+            <% if (typeof eligibility !== 'undefined' && eligibility && eligibility.existingReview) { %>
+                <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <i class="ph-bold ph-check-circle text-emerald-600"></i>
+                    <span>You reviewed this company</span>
+                </span>
+            <% } else { %>
+                <a href="/companies/<%= company._id %>/reviews/new"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all">
+                    <i class="ph-bold ph-pencil-simple text-sm"></i>
+                    <span>Write a Verified Review</span>
+                </a>
+            <% } %>
         <% } %>
     </div>
 
