@@ -241,6 +241,21 @@ test('every page gets the motion layer early in <head>, with a safety net', asyn
     assert.match(html, /setTimeout\([\s\S]*__ipMotionReady[\s\S]*motion-pending/, 'content is shown after a short wait even if the script never runs');
 });
 
+test('shared shell behavior is served from deferred assets instead of inline layout code', () => {
+    const layout = read('views/layouts/boilerplate.ejs');
+    const styles = read('public/css/app-shell.css');
+    const script = read('public/js/app-shell.js');
+
+    assert.match(layout, /<link rel="stylesheet" href="\/css\/app-shell\.css">/);
+    assert.match(layout, /<script src="\/js\/app-shell\.js" defer><\/script>/);
+    assert.doesNotMatch(layout, /<style>/);
+    assert.doesNotMatch(layout, /include\('\.\.\/partials\/loading-script'\)/);
+    assert.match(styles, /#back-to-top-btn\.visible/);
+    assert.match(styles, /\.invisible-scrollbar::-webkit-scrollbar/);
+    assert.match(script, /addEventListener\('submit'/);
+    assert.match(script, /prefers-reduced-motion: reduce/);
+});
+
 // --- confirmation dialogs ---
 
 function formWithConfirm(doc, question) {
