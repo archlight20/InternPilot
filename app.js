@@ -112,6 +112,11 @@ async function main() {
     await requireTransactionSupport(mongoose.connection);
 }
 
+// Signed-in devices (#196): notes the device for each sign-in, signs a session
+// out once the password changes, and serves the /account/sessions page.
+app.use(require('./middleware/trackSession'));
+app.use(require('./routes/accountSessions'));
+
 // In-app messaging (#136). Mounted before every page route so its unread
 // count is available to the header on all pages, the homepage included.
 app.use(require('./routes/messages'));
