@@ -179,6 +179,9 @@
                     const safeMeetingLink = interview ? (safeUrl(interview.meetingLink).url || '') : '';
                     const statusUpdatedAt = asValidDate(app.statusUpdatedAt || app.appliedAt);
                     const hasApplicationKit = Boolean(app.applicationKit);
+                    const issuedDocuments = (typeof issuedDocumentsByApplication !== 'undefined' && issuedDocumentsByApplication[String(app._id)])
+                        ? issuedDocumentsByApplication[String(app._id)]
+                        : [];
                 %>
 
                 <article id="app-card-<%= app._id %>"
@@ -302,6 +305,14 @@
                                         <i class="ph-bold ph-briefcase" aria-hidden="true"></i>
                                     </a>
                                 <% } %>
+
+                                <% issuedDocuments.forEach(type => { %>
+                                    <a href="/candidate/applications/<%= app._id %>/certificates/<%= type %>"
+                                        class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100">
+                                        <i class="ph-bold ph-download-simple" aria-hidden="true"></i>
+                                        <%= type === 'internship-certificate' ? 'Certificate PDF' : 'LOR PDF' %>
+                                    </a>
+                                <% }) %>
                             </div>
                         </section>
                     </div>

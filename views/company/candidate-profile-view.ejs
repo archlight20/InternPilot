@@ -154,6 +154,23 @@
                 </div>
             </div>
 
+            <% if (canReviewApplications && application.status === 'Hired') { %>
+                <div class="bg-white border border-indigo-200 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div class="border-b border-indigo-100 pb-3">
+                        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <i class="ph-bold ph-files text-indigo-600 text-lg"></i>
+                            Internship documents
+                        </h2>
+                        <p class="mt-1 text-xs text-slate-500">Issue a certificate and recommendation letter as downloadable PDFs for the candidate.</p>
+                    </div>
+                    <form action="/company/applications/<%= application._id %>/certificates/issues" method="POST">
+                        <button type="submit" class="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700">
+                            <i class="ph-bold ph-seal-check mr-1" aria-hidden="true"></i> Issue Certificate &amp; LOR
+                        </button>
+                    </form>
+                </div>
+            <% } %>
+
             <% if (canIssueOffer) { %>
                 <div class="bg-white border border-emerald-200 rounded-2xl p-6 shadow-sm space-y-4">
                     <div class="border-b border-emerald-100 pb-3">

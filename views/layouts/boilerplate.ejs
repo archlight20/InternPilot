@@ -53,7 +53,7 @@
     <%- include('../partials/header') %>
     <%- include('../partials/admin-announcements') %>
 
-        <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <main class="flex-grow <%= typeof currentPath !== 'undefined' && currentPath === '/' ? 'w-full px-0 py-0' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full' %>">
             <%- include('../partials/flash') %>
             <% if (typeof siteAnnouncements !== 'undefined' && siteAnnouncements && siteAnnouncements.length) { %><%- include('../partials/site-announcements') %><% } %>
             <%- body %>

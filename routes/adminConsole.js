@@ -245,7 +245,7 @@ router.use(async (req, res, next) => {
     }
 });
 
-router.get('/admin/console', ...requireAdmin, async (req, res) => {
+router.get(['/admin/console', '/admin/overview'], ...requireAdmin, async (req, res) => {
     try {
         const analytics = await buildAnalytics(parseRange(req.query.range));
         return res.render('admin-console/overview', { analytics, safeJson });
@@ -254,7 +254,7 @@ router.get('/admin/console', ...requireAdmin, async (req, res) => {
     }
 });
 
-router.get('/admin/console/users', ...requireAdmin, async (req, res) => {
+router.get(['/admin/console/users', '/admin/users'], ...requireAdmin, async (req, res) => {
     try {
         const users = await listUsers(req.query);
         return res.render('admin-console/users', { users, filters: { search: normalizedText(req.query.search, 100), role: CONSOLE_ROLES.includes(req.query.role) ? req.query.role : '', status: ['active', 'suspended'].includes(req.query.status) ? req.query.status : '' }, roles: CONSOLE_ROLES });
@@ -263,7 +263,7 @@ router.get('/admin/console/users', ...requireAdmin, async (req, res) => {
     }
 });
 
-router.get('/admin/console/users/:id', ...requireAdmin, async (req, res) => {
+router.get(['/admin/console/users/:id', '/admin/users/:id'], ...requireAdmin, async (req, res) => {
     if (!validId(req.params.id)) return consoleError(req, res, 'Invalid user ID.', '/admin/console/users');
     try {
         const user = await User.findById(req.params.id).lean();
@@ -281,7 +281,7 @@ router.get('/admin/console/users/:id', ...requireAdmin, async (req, res) => {
     }
 });
 
-router.post('/admin/console/users/:id/suspend', ...requireAdmin, async (req, res) => {
+router.post(['/admin/console/users/:id/suspend', '/admin/users/:id/suspend'], ...requireAdmin, async (req, res) => {
     if (!validId(req.params.id)) return consoleError(req, res, 'Invalid user ID.', '/admin/console/users');
     const reason = normalizedText(req.body.reason, 1000);
     if (!reason) return consoleError(req, res, 'A suspension reason is required.', `/admin/console/users/${req.params.id}`);
@@ -302,7 +302,7 @@ router.post('/admin/console/users/:id/suspend', ...requireAdmin, async (req, res
     }
 });
 
-router.post('/admin/console/users/:id/reactivate', ...requireAdmin, async (req, res) => {
+router.post(['/admin/console/users/:id/reactivate', '/admin/users/:id/reactivate'], ...requireAdmin, async (req, res) => {
     if (!validId(req.params.id)) return consoleError(req, res, 'Invalid user ID.', '/admin/console/users');
     try {
         const user = await User.findById(req.params.id);
@@ -320,7 +320,7 @@ router.post('/admin/console/users/:id/reactivate', ...requireAdmin, async (req, 
     }
 });
 
-router.get('/admin/console/listings', ...requireAdmin, async (req, res) => {
+router.get(['/admin/console/listings', '/admin/listings'], ...requireAdmin, async (req, res) => {
     try {
         const search = normalizedText(req.query.search, 100);
         const status = ['published', 'paused', 'closed', 'draft'].includes(req.query.status) ? req.query.status : '';
@@ -336,7 +336,7 @@ router.get('/admin/console/listings', ...requireAdmin, async (req, res) => {
     }
 });
 
-router.post('/admin/console/listings/:id/moderate', ...requireAdmin, async (req, res) => {
+router.post(['/admin/console/listings/:id/moderate', '/admin/listings/:id/moderate'], ...requireAdmin, async (req, res) => {
     if (!validId(req.params.id)) return consoleError(req, res, 'Invalid listing ID.', '/admin/console/listings');
     const action = ['pause', 'close', 'restore'].includes(req.body.action) ? req.body.action : '';
     const reason = normalizedText(req.body.reason, 1000);
@@ -368,7 +368,7 @@ router.post('/admin/console/listings/:id/moderate', ...requireAdmin, async (req,
     }
 });
 
-router.get('/admin/console/applications', ...requireAdmin, async (req, res) => {
+router.get(['/admin/console/applications', '/admin/applications'], ...requireAdmin, async (req, res) => {
     try {
         const applications = await listApplications(req.query);
         return res.render('admin-console/applications', { applications, filters: { search: normalizedText(req.query.search, 100), status: APPLICATION_STATUSES.includes(req.query.status) ? req.query.status : '' }, statuses: APPLICATION_STATUSES });
@@ -395,7 +395,7 @@ router.get('/admin/console/export/:kind', ...requireAdmin, async (req, res) => {
     }
 });
 
-router.get('/admin/console/announcements', ...requireAdmin, async (req, res) => {
+router.get(['/admin/console/announcements', '/admin/announcements'], ...requireAdmin, async (req, res) => {
     try {
         const announcements = await Announcement.find().sort({ startsAt: -1 }).limit(100).lean();
         return res.render('admin-console/announcements', { announcements, now: new Date() });
@@ -404,7 +404,7 @@ router.get('/admin/console/announcements', ...requireAdmin, async (req, res) => 
     }
 });
 
-router.post('/admin/console/announcements', ...requireAdmin, async (req, res) => {
+router.post(['/admin/console/announcements', '/admin/announcements'], ...requireAdmin, async (req, res) => {
     const title = normalizedText(req.body.title, 140);
     const message = normalizedText(req.body.message, 2000);
     const audience = ['all', 'candidates', 'companies'].includes(req.body.audience) ? req.body.audience : 'all';
@@ -430,7 +430,7 @@ router.post('/admin/console/announcements', ...requireAdmin, async (req, res) =>
     }
 });
 
-router.post('/admin/console/announcements/:id/delete', ...requireAdmin, async (req, res) => {
+router.post(['/admin/console/announcements/:id/delete', '/admin/announcements/:id/delete'], ...requireAdmin, async (req, res) => {
     if (!validId(req.params.id)) return consoleError(req, res, 'Invalid announcement ID.', '/admin/console/announcements');
     try {
         const announcement = await Announcement.findByIdAndDelete(req.params.id);
@@ -443,7 +443,7 @@ router.post('/admin/console/announcements/:id/delete', ...requireAdmin, async (r
     }
 });
 
-router.get('/admin/console/audit-log', ...requireAdmin, async (req, res) => {
+router.get(['/admin/console/audit-log', '/admin/console/audit', '/admin/audit'], ...requireAdmin, async (req, res) => {
     try {
         const entries = await AdminAuditLog.find().sort({ createdAt: -1 }).limit(200).populate('actor', 'name email').lean();
         return res.render('admin-console/audit-log', { entries });

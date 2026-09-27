@@ -23,6 +23,7 @@ const { formatRelativeTime, formatLocalizedDateTime } = require('../utils/dateFo
 const { buildSkillProfiles, parseSkillProfiles, skillNames } = require('../utils/skillProfiles');
 const { sanitizeHttpUrl } = require('../utils/safeUrl');
 const { filterAndSortApplications } = require('../utils/applicationSearch');
+const { getIssuedDocumentsByApplication } = require('../utils/internshipDocuments');
 const { calculateProfileCompletion } = require('../utils/profileCompletion');
 
 cloudinary.config({
@@ -1037,11 +1038,13 @@ router.get('/candidate/applications', isAuthenticated, authorize('candidate'), a
             .sort(sortObj);
 
         const applicationSearch = filterAndSortApplications(applications, req.query);
+        const issuedDocumentsByApplication = await getIssuedDocumentsByApplication(applicationSearch.applications, userId);
 
         res.render('candidate/candidate-tracker', {
             candidate,
             currentUser: req.user,
             applications: applicationSearch.applications,
+            issuedDocumentsByApplication,
             stats,
             searchQuery: applicationSearch.search,
             statusFilter: applicationSearch.status,

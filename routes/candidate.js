@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const router = express.Router();
 
 const Application = require('../models/Application');
+const InternshipDocument = require('../models/InternshipDocument');
 const User = require('../models/User');
 const Internship = require('../models/Internship');
 const SavedSearch = require('../models/SavedSearch');
@@ -14,6 +15,7 @@ const { notifyCandidateWithdrawal } = require('../utils/recruiterNotifications')
 const { isAuthenticated, authorize } = require('../middleware/auth');
 const { formatRelativeTime, formatLocalizedDateTime, formatDeadlineUrgency } = require('../utils/dateFormat');
 const { filterAndSortApplications } = require('../utils/applicationSearch');
+const { DOCUMENT_TYPES, getIssuedDocumentsByApplication } = require('../utils/internshipDocuments');
 const {
     normalizeSavedSearchCriteria,
     hasSavedSearchCriteria,
@@ -545,11 +547,13 @@ router.get('/candidate/my-applications', isAuthenticated, authorize('candidate')
             .populate('internship')
             .sort(sortObj);
         const applicationSearch = filterAndSortApplications(applications, req.query);
+        const issuedDocumentsByApplication = await getIssuedDocumentsByApplication(applicationSearch.applications, userId);
 
         res.render('candidate/candidate-tracker', {
             candidate,
             currentUser: req.user,
             applications: applicationSearch.applications,
+            issuedDocumentsByApplication,
             stats,
             searchQuery: applicationSearch.search,
             statusFilter: applicationSearch.status,
@@ -599,6 +603,29 @@ router.get('/candidate/applications/:id/kit', isAuthenticated, authorize('candid
         console.error('Error loading submitted application kit:', error);
         if (req.flash) req.flash('error_msg', 'Unable to load the submitted application kit.');
         return res.redirect('/candidate/applications');
+    }
+});
+
+router.get('/candidate/applications/:id/certificates/:type', isAuthenticated, authorize('candidate'), async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id) || !DOCUMENT_TYPES.includes(req.params.type)) {
+            return res.status(404).send('Document not found.');
+        }
+
+        const candidateId = req.user._id || req.user.id;
+        const document = await InternshipDocument.findOne({
+            application: req.params.id,
+            candidate: candidateId,
+            type: req.params.type
+        });
+        if (!document) return res.status(404).send('Document not found.');
+
+        res.set('Content-Type', document.contentType || 'application/pdf');
+        res.set('Content-Disposition', `attachment; filename="${document.fileName}"`);
+        return res.end(document.fileData);
+    } catch (error) {
+        console.error('Error downloading internship document:', error);
+        return res.status(500).send('Unable to download this document.');
     }
 });
 
