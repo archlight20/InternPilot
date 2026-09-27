@@ -146,6 +146,7 @@ app.use('/auth', authRoutes);
 app.use('/internships', internshipRoutes);
 app.use('/', userRoutes);
 app.use('/', candidateRoutes);
+app.use('/', require('./routes/candidateVerification'));
 app.use('/', companyRoutes);
 app.use('/', require('./routes/offers'));
 app.use('/admin', adminRoutes);

@@ -1,4 +1,9 @@
 <% layout('layouts/boilerplate') %>
+<%
+    const dashboardPendingCompanies = typeof pendingCompanies !== 'undefined' && Array.isArray(pendingCompanies) ? pendingCompanies : [];
+    const dashboardApprovedCompanies = typeof approvedCompanies !== 'undefined' && Array.isArray(approvedCompanies) ? approvedCompanies : [];
+    const dashboardRecentUsers = typeof recentUsers !== 'undefined' && Array.isArray(recentUsers) ? recentUsers : [];
+%>
 
     <div class="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
 
@@ -17,6 +22,24 @@
                 <a href="/admin/overview" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                     <i class="ph-bold ph-chart-line-up" aria-hidden="true"></i>Admin console
                 </a>
+            <span
+                class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                System Operational
+            </span>
+            <a href="/admin/console" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">Admin Console</a>
+        </div>
+
+        <a href="/admin/overview" id="adminConsoleLink" class="flex flex-wrap items-center justify-between gap-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-6 py-4 shadow-sm transition-colors">
+            <span><span class="block font-bold">Admin console</span><span class="block text-xs text-indigo-100">Analytics, users, listing moderation, applications, announcements and the audit log</span></span>
+            <span class="inline-flex items-center gap-1 text-sm font-semibold">Open <i class="ph-bold ph-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Total Candidates</h3>
+                <p class="text-3xl font-extrabold text-gray-900 mt-2">
+                    <%= stats.candidates %>
+                </p>
             </div>
         </header>
 
@@ -41,9 +64,28 @@
                 <div><h2 class="text-lg font-bold text-slate-950 dark:text-white">Pending company verifications</h2>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review submitted details and supporting documents.</p></div>
                 <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300"><%= stats.pendingVerifications %> pending</span>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-sm font-semibold text-amber-600 uppercase tracking-wider">Pending Verifications</h3>
+                <p class="text-3xl font-extrabold text-amber-600 mt-2">
+                    <%= stats.pendingVerifications %>
+                </p>
             </div>
 
-            <% if (pendingCompanies && pendingCompanies.length> 0) { %>
+            <a href="/admin/candidate-verifications" class="bg-white p-6 rounded-xl shadow-sm border border-indigo-100 transition hover:border-indigo-300 hover:shadow-md">
+                <h3 class="text-sm font-semibold text-indigo-600 uppercase tracking-wider">Candidate document reviews</h3>
+                <p class="text-3xl font-extrabold text-indigo-700 mt-2"><%= stats.pendingCandidateVerifications || 0 %></p>
+                <p class="mt-1 text-xs font-semibold text-indigo-700">Open verification queue →</p>
+            </a>
+        </div>
+
+        <% if (typeof grievanceSummary !== 'undefined' && grievanceSummary) { %><%- include('../grievances/admin-summary', { summary: grievanceSummary }) %><% } %>
+
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">Pending Company Verification Requests</h2>
+            </div>
+
+            <% if (dashboardPendingCompanies.length > 0) { %>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
@@ -60,6 +102,10 @@
                             <% pendingCompanies.forEach(comp=> { %>
                                 <tr class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                     <td class="px-5 py-4 font-semibold text-slate-900 dark:text-slate-100 sm:px-6">
+                        <tbody class="divide-y divide-gray-100 text-sm">
+                            <% dashboardPendingCompanies.forEach(comp=> { %>
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="py-4 px-6 font-semibold text-gray-800">
                                         <%= (comp.companyDetails && comp.companyDetails.companyName) ?
                                             comp.companyDetails.companyName : comp.name %>
                                     </td>
@@ -120,6 +166,7 @@
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Suspending a company immediately closes its published and paused listings.</p>
             </div>
             <% if (typeof approvedCompanies !== 'undefined' && approvedCompanies && approvedCompanies.length > 0) { %>
+            <% if (dashboardApprovedCompanies.length > 0) { %>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
@@ -137,6 +184,13 @@
                                     <td class="px-5 py-4 text-slate-600 dark:text-slate-300 sm:px-6"><%= comp.email %></td>
                                     <td class="px-5 py-4 text-slate-600 dark:text-slate-300 sm:px-6"><%= comp.companyDetails?.verificationReviewedAt ? new Date(comp.companyDetails.verificationReviewedAt).toLocaleDateString('en-IN') : 'Legacy approval' %></td>
                                     <td class="px-5 py-4 text-right sm:px-6">
+                        <tbody class="divide-y divide-gray-100 text-sm">
+                            <% dashboardApprovedCompanies.forEach(comp => { %>
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="py-4 px-6 font-semibold text-gray-800"><%= comp.companyDetails?.companyName || comp.name %></td>
+                                    <td class="py-4 px-6 text-gray-600"><%= comp.email %></td>
+                                    <td class="py-4 px-6 text-gray-600"><%= comp.companyDetails?.verificationReviewedAt ? new Date(comp.companyDetails.verificationReviewedAt).toLocaleDateString('en-IN') : 'Legacy approval' %></td>
+                                    <td class="py-4 px-6 text-right">
                                         <form action="/admin/suspend-company/<%= comp._id %>" method="POST" class="flex items-center justify-end gap-2" onsubmit="return confirm('Suspend this company and close its listings?');">
                                             <input type="text" name="reason" required maxlength="1000" placeholder="Reason for suspension" class="w-40 rounded-md border border-slate-300 bg-white px-2 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
                                             <button type="submit" class="rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-rose-800">Suspend</button>
@@ -169,6 +223,10 @@
                         <% recentUsers.forEach(u=> { %>
                             <tr class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                 <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100 sm:px-6">
+                    <tbody class="divide-y divide-gray-100 text-sm">
+                        <% dashboardRecentUsers.forEach(u=> { %>
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="py-3 px-6 font-medium text-gray-800">
                                     <%= u.name %>
                                 </td>
                                 <td class="px-5 py-3 text-slate-600 dark:text-slate-300 sm:px-6">

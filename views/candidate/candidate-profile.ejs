@@ -28,6 +28,14 @@
     const savedResumeVersions = activeUser && Array.isArray(activeUser.resumeVersions)
         ? activeUser.resumeVersions
         : [];
+    const verificationRecord = typeof candidateVerification !== 'undefined' && candidateVerification ? candidateVerification : null;
+    const verificationStatus = verificationRecord && verificationRecord.status ? verificationRecord.status : 'pending';
+    const verificationBadge = {
+        pending: { label: 'Verification Pending', classes: 'bg-amber-50 text-amber-800 border-amber-200', icon: 'ph-clock' },
+        approved: { label: 'Identity Verified', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'ph-seal-check' },
+        rejected: { label: 'Verification Needs Action', classes: 'bg-rose-50 text-rose-700 border-rose-200', icon: 'ph-warning-circle' },
+        suspended: { label: 'Verification Suspended', classes: 'bg-rose-100 text-rose-800 border-rose-300', icon: 'ph-warning-octagon' }
+    }[verificationStatus] || { label: 'Verification Pending', classes: 'bg-amber-50 text-amber-800 border-amber-200', icon: 'ph-clock' };
     %>
 
     <% const pmisStatus = (typeof eligibility !== 'undefined' && eligibility) 
@@ -106,6 +114,10 @@
                                 <i class="ph-bold <%= pmisStatus.badge.icon %>"></i>
                                 <%= pmisStatus.badge.label %>
                             </span>
+                            <a href="/candidate/verification" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border <%= verificationBadge.classes %> shadow-xs transition hover:opacity-80" title="Manage identity and PMIS verification">
+                                <i class="ph-bold <%= verificationBadge.icon %>"></i>
+                                <%= verificationBadge.label %>
+                            </a>
                             <a href="#profileCompletionCard" id="headerCompletionBadge"
                                 class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border <%= completion.badge.bgClass %> shadow-xs hover:opacity-90 transition-all cursor-pointer"
                                 title="Click to view profile completion checklist">
