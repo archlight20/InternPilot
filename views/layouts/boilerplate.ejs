@@ -47,6 +47,7 @@
             height: 0 !important;
         }
     </style>
+    <%- include('../partials/pwa-head') %>
 </head>
 
 <body class="h-full flex flex-col bg-slate-50 font-sans text-slate-800 m-0 overflow-x-hidden">
@@ -64,6 +65,7 @@
 
             <% if (typeof currentUser !=='undefined' && currentUser && currentUser.role==='candidate' ) { %>
                 <%- include('../partials/chat-widget') %>
+                <%- include('../partials/quick-apply-modal') %>
                     <% } %>
 
     <button
