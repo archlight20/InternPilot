@@ -431,7 +431,7 @@
                                 <i class="ph-bold ph-briefcase"></i> <%= requiresApplicationKit ? 'Prepare Application Kit' : 'Tailor Application' %>
                             </a>
                             <% if (!requiresApplicationKit) { %>
-                                <form action="/internships/<%= item._id %>/apply" method="POST" class="w-full">
+                                <form action="/internships/<%= item._id %>/apply" method="POST" class="w-full" data-quick-apply-form data-no-loading data-internship-title="<%= item.title %>" data-company-name="<%= item.companyName || item.company || '' %>">
                                     <button type="submit"
                                         class="mt-2 w-full text-center py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5">
                                         <i class="ph-bold ph-paper-plane-tilt"></i> Quick Apply
