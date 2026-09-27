@@ -1,4 +1,7 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const { randomUUID } = require('crypto');
 
 const CandidateVerification = require('../models/CandidateVerification');
 const { isAuthenticated, authorize } = require('../middleware/auth');
@@ -26,6 +29,35 @@ function handleVerificationDocumentsUpload(req, res, next) {
         if (req.flash) req.flash('error_msg', message);
         return res.redirect('/candidate/verification');
     });
+}
+
+// Cloudinary is the production store for verification evidence. A local
+// fallback keeps the UI testable when credentials are absent in development;
+// it is intentionally disabled in production so that verification documents
+// are never silently stored on the application server there.
+async function storeVerificationDocument(file, {
+    upload = uploadBufferToCloudinary,
+    environment = process.env.NODE_ENV,
+    uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'candidate-verification'),
+    publicUrlBase = '/uploads/candidate-verification'
+} = {}) {
+    try {
+        return await upload(file, 'internpilot/candidate_verification');
+    } catch (cloudError) {
+        if (environment === 'production') throw cloudError;
+
+        const safeName = String(file.originalname || 'verification-document')
+            .replace(/[^a-zA-Z0-9_.-]/g, '_');
+        const fileName = `${Date.now()}_${randomUUID()}_${safeName}`;
+        await fs.promises.mkdir(uploadDir, { recursive: true });
+        await fs.promises.writeFile(path.join(uploadDir, fileName), file.buffer);
+
+        console.warn('Cloudinary upload failed; saved candidate verification document locally for development:', cloudError.message || cloudError);
+        return {
+            public_id: `local/candidate_verification/${fileName}`,
+            secure_url: `${publicUrlBase}/${fileName}`
+        };
+    }
 }
 
 router.get('/candidate/verification', isAuthenticated, authorize('candidate'), async (req, res) => {
@@ -60,7 +92,7 @@ router.post('/candidate/verification/documents', isAuthenticated, authorize('can
             ? req.body.documentType
             : 'identity';
         const documents = await Promise.all(files.map(async file => {
-            const uploaded = await uploadBufferToCloudinary(file, 'internpilot/candidate_verification');
+            const uploaded = await storeVerificationDocument(file);
             return {
                 documentType,
                 fileName: String(file.originalname || 'verification-document').slice(0, 180),
@@ -93,4 +125,5 @@ router.post('/candidate/verification/documents', isAuthenticated, authorize('can
     }
 });
 
+router.storeVerificationDocument = storeVerificationDocument;
 module.exports = router;

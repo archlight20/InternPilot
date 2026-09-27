@@ -1,5 +1,8 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const mongoose = require('mongoose');
+const os = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 
 const CandidateVerification = require('../models/CandidateVerification');
@@ -117,6 +120,35 @@ test('approved and suspended verifications cannot be resubmitted by a candidate'
         assert.equal(verification.history.length, 0);
         assert.equal(verification.documents[0].storageKey, 'existing-document');
     });
+});
+
+test('candidate verification documents fall back to local storage only outside production', async t => {
+    const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'internpilot-verification-'));
+    t.after(() => fs.rmSync(uploadDir, { recursive: true, force: true }));
+
+    const cloudError = new Error('Missing required parameter - api_key');
+    const file = {
+        originalname: 'identity proof.pdf',
+        mimetype: 'application/pdf',
+        buffer: Buffer.from('test verification document')
+    };
+    const upload = async () => { throw cloudError; };
+
+    const stored = await candidateVerificationRouter.storeVerificationDocument(file, {
+        upload,
+        environment: 'development',
+        uploadDir,
+        publicUrlBase: '/uploads/candidate-verification'
+    });
+    const storedFile = stored.public_id.replace('local/candidate_verification/', '');
+
+    assert.match(stored.public_id, /^local\/candidate_verification\//);
+    assert.equal(stored.secure_url, `/uploads/candidate-verification/${storedFile}`);
+    assert.deepEqual(fs.readFileSync(path.join(uploadDir, storedFile)), file.buffer);
+    await assert.rejects(
+        () => candidateVerificationRouter.storeVerificationDocument(file, { upload, environment: 'production' }),
+        cloudError
+    );
 });
 
 test('application and offer gates accept only approved candidate verification', async () => {
