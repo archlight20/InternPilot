@@ -151,6 +151,36 @@ const userSchema = new mongoose.Schema({
 
     isEmailVerified: { type: Boolean, default: false },
 
+    // Public Portfolio & Showcase Settings (#230)
+    portfolioVisibility: {
+        type: String,
+        enum: ['public', 'recruiters', 'private'],
+        default: 'public',
+        index: true
+    },
+    portfolioContactVisible: {
+        type: Boolean,
+        default: false
+    },
+    portfolioHeadline: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: 200
+    },
+    portfolioBio: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: 2000
+    },
+    portfolioSocial: {
+        github: { type: String, default: '', trim: true },
+        linkedin: { type: String, default: '', trim: true },
+        twitter: { type: String, default: '', trim: true },
+        website: { type: String, default: '', trim: true }
+    },
+
     otp: { type: String },
     otpExpires: { type: Date },
     lastOtpSentAt: { type: Date },
