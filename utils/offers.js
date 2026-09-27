@@ -2,6 +2,8 @@ const Offer = require('../models/Offer');
 const Application = require('../models/Application');
 const Internship = require('../models/Internship');
 const Notification = require('../models/Notification');
+const CandidateVerification = require('../models/CandidateVerification');
+const { assertCandidateVerified } = require('./candidateVerification');
 
 const ELIGIBLE_APPLICATION_STATUSES = ['Shortlisted', 'Interview'];
 const DECLINED_APPLICATION_STATUS = 'Offer Declined';
@@ -194,8 +196,13 @@ async function acceptOffer({
     now = new Date(),
     OfferModel = Offer,
     ApplicationModel = Application,
-    InternshipModel = Internship
+    InternshipModel = Internship,
+    CandidateVerificationModel = CandidateVerification
 }) {
+    // This runs before the offer is moved into its short-lived `accepting`
+    // state, so an unverified candidate cannot reserve a vacancy.
+    await assertCandidateVerified(candidateId, CandidateVerificationModel);
+
     const offer = await OfferModel.findOneAndUpdate(
         {
             _id: offerId,
