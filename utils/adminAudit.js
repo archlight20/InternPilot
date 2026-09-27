@@ -5,6 +5,7 @@ const ACTION_LABELS = {
     'user.suspend': 'Suspended sign-in',
     'user.reactivate': 'Reactivated sign-in',
     'user.delete': 'Deleted an account',
+    'user.data_export': 'Exported personal data (DPDP)',
     'listing.pause': 'Paused a listing',
     'listing.close': 'Closed a listing',
     'listing.restore': 'Restored a listing',

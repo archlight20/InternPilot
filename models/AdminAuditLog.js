@@ -7,7 +7,8 @@ const adminAuditLogSchema = new mongoose.Schema({
         enum: [
             'USER_SUSPENDED', 'USER_REACTIVATED',
             'LISTING_PAUSED', 'LISTING_CLOSED', 'LISTING_RESTORED',
-            'ANNOUNCEMENT_CREATED', 'ANNOUNCEMENT_UPDATED', 'ANNOUNCEMENT_DELETED'
+            'ANNOUNCEMENT_CREATED', 'ANNOUNCEMENT_UPDATED', 'ANNOUNCEMENT_DELETED',
+            'DATA_EXPORTED', 'ACCOUNT_DELETED'
         ],
         required: true,
         index: true

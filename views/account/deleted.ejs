@@ -1,0 +1,38 @@
+<% layout('layouts/boilerplate') %>
+
+<div class="max-w-xl mx-auto px-4 py-16 text-center space-y-6">
+    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto shadow-xs">
+        <i class="ph-bold ph-shield-check"></i>
+    </div>
+
+    <div class="space-y-2">
+        <h1 class="text-2xl font-black text-slate-800 tracking-tight">Account Successfully Closed</h1>
+        <p class="text-xs text-slate-500">Ministry of Corporate Affairs &bull; Digital Personal Data Protection Act, 2023 (DPDP Act 2023)</p>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs text-left space-y-4 text-xs text-slate-600 leading-relaxed">
+        <p>
+            Your account associated with <strong class="text-slate-800"><%= email %></strong> and all associated personal data have been permanently erased from our active databases.
+        </p>
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-1.5">
+            <div class="flex items-center gap-2 font-bold text-slate-700">
+                <i class="ph-bold ph-envelope-simple text-indigo-600"></i>
+                <span>Confirmation Email Sent</span>
+            </div>
+            <p class="text-slate-500 text-[11px]">
+                A formal deletion confirmation has been dispatched to <strong><%= email %></strong> for your personal records.
+            </p>
+        </div>
+        <p class="text-[11px] text-slate-400">
+            If you wish to participate in the Prime Minister's Internship Scheme in the future, you are welcome to create a new account anytime.
+        </p>
+    </div>
+
+    <div>
+        <a href="/"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-xs">
+            <i class="ph-bold ph-house"></i>
+            Return to Homepage
+        </a>
+    </div>
+</div>

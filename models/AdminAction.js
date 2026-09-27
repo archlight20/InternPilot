@@ -5,6 +5,7 @@ const ACTIONS = [
     'user.suspend',
     'user.reactivate',
     'user.delete',
+    'user.data_export',
     'listing.pause',
     'listing.close',
     'listing.restore',
